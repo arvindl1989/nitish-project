@@ -1,198 +1,212 @@
-# AEM QA Framework 🚀
+# AEM QA Framework ⚡
 
-> **Automated 52-Point Quality Assurance Engine & Analytics Dashboard for Adobe Experience Manager (AEM)**
+> **Automated 49-point quality audit engine & dashboard for Adobe Experience Manager**
 
-[![Stack](https://img.shields.io/badge/Stack-Vanilla%20JS%20%7C%20Node.js-blue.svg)](#-technology-stack)
-[![Dependencies](https://img.shields.io/badge/Dependencies-Zero%20(0)-brightgreen.svg)](#-key-features)
-[![Deploy](https://img.shields.io/badge/Deployment-Local%20%7C%20Vercel%20Serverless-orange.svg)](#-deployment--hosting)
-[![License](https://img.shields.io/badge/License-MIT-purple.svg)](#-license)
+[![Stack](https://img.shields.io/badge/Stack-Vanilla%20JS%20%7C%20Node.js-blue.svg)](#technology)
+[![Dependencies](https://img.shields.io/badge/npm%20dependencies-0-brightgreen.svg)](#technology)
+[![Deploy](https://img.shields.io/badge/Deploy-Railway-purple.svg)](#deploying-to-railway)
+[![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](#license)
 
-The **AEM QA Framework** is a zero-dependency, browser-native QA automation platform designed specifically for Adobe Experience Manager (AEM as a Cloud Service, AEM 6.5, Author Preview, Stage, and Production environments). It enables QA engineers, content authors, and release managers to run **52 automated checks across 4 quality pillars in under 15 seconds** directly inside active browser sessions.
-
----
-
-## ⚡ Quick Links & Navigation
-
-- 👔 [**Non-Technical Stakeholder & Executive QA Overview**](file:///c:/git-repo/QA/STAKEHOLDER_QA_OVERVIEW.md)
-- 📖 [**QA Framework Technical Architecture Guide**](file:///c:/git-repo/QA/QA_FRAMEWORK_DOCUMENTATION.md)
-- 📗 [**AEM QA Framework Comprehensive Implementation Guide**](file:///c:/git-repo/QA/AEM_QA_FRAMEWORK_GUIDE.md)
-- 📊 [**Sprint Demo Presentation Guide**](file:///c:/git-repo/QA/SPRINT_DEMO_PRESENTATION_GUIDE.md)
-- 📜 [**Prototype Walkthrough**](file:///c:/git-repo/QA/walkthrough.md)
+A zero-dependency, browser-native QA tool for AEM (Cloud Service, 6.5, Author preview,
+Stage and Production). It runs **49 automated checks across 4 quality pillars** inside
+your already-authenticated browser tab, then reports to a self-hosted dashboard.
 
 ---
 
-## 💡 Why AEM QA Framework?
+## Why it exists
 
-Testing AEM authoring preview URLs (`author-pXXXX-eYYYY.adobeaemcloud.com`) with traditional headless test suites (Playwright, Cypress, Selenium, Lighthouse CLI) is difficult because Adobe IMS authentication walls block unauthenticated requests. 
+Auditing AEM author preview URLs (`author-pXXXX-eYYYY.adobeaemcloud.com`) with
+headless tooling is awkward, because Adobe IMS blocks unauthenticated requests:
 
 ```
-❌ Traditional CLI / Playwright → Hits Adobe IMS login wall (401/302)
-❌ External CORS Fetch          → Blocked by Cross-Origin Security Policies
-✅ AEM QA Bookmarklet Engine   → Executes natively inside browser context (Inherits IMS session & cookies)
+✗ Playwright / Cypress / Lighthouse CLI  → hits the IMS login wall (401/302)
+✗ External CORS fetch                    → blocked by cross-origin policy
+✓ AEM QA bookmarklet                     → runs in your tab, inherits the IMS session
 ```
 
-The AEM QA Framework executes **inside your active, authenticated browser tab**, bypassing authentication barriers while auditing live DOM structures, links, accessibility, responsive rules, and AEM-specific component bugs.
+The engine executes inside the authenticated page, so it sees exactly what the
+author sees.
 
 ---
 
-## ✨ Key Features
-
-- 🛡️ **Zero Third-Party npm Dependencies**: 100% pure Vanilla JS and native Node.js APIs for ultimate security, portability, and zero supply chain vulnerabilities.
-- 🔑 **Adobe IMS Auth Native**: Operates within your active browser tab, inheriting author cookies, SAML session tokens, and preview permissions.
-- 🎯 **52-Point 4-Pillar Inspection Engine**:
-  - **Metadata & SEO Audit** (Title, Description, Canonical, OpenGraph, Twitter Cards, Robots).
-  - **Content & Component Integrity** (H1-H6 hierarchy, raw `/content/` paths, AEM author/stage leaks, broken links, image alt attributes).
-  - **Responsive Layout & Visual Checks** (Viewport configuration, mobile touch targets, viewport overflows, flex/grid wrap rules).
-  - **Accessibility (a11y) & ARIA Compliance** (Color contrast, landmark regions, form labeling, focus indicators, keyboard traps).
-- ⚡ **Asynchronous Link & CTA Verification**: Batch-checks link health via background `HEAD`/`GET` requests with configurable concurrency limits and timeouts.
-- 🎨 **Floating Dark Mode QA Side Panel**: Renders immediate weighted scores, PASS/WARN/FAIL statuses, and P1 Hard Blocker alerts without disturbing page layout.
-- 📊 **Centralized Quality Dashboard**: Includes an interactive Web UI (`public/index.html`) for multi-page report aggregation, trend analysis, and defect inspection.
-- ☁️ **Dual Server Operating Mode**: Runs as a local HTTP report server (`server.js` / `server.local.js`) or deploys serverlessly to Vercel (`api/report.js`).
-
----
-
-## 🛠️ Project Architecture & Directory Map
-
-```
-QA/
-├── README.md                          ← Main Project Entry Point
-├── QA_FRAMEWORK_DOCUMENTATION.md      ← Full Architecture & Technical Reference
-├── AEM_QA_FRAMEWORK_GUIDE.md          ← Exhaustive Implementation Blueprint
-├── SPRINT_DEMO_PRESENTATION_GUIDE.md  ← Executive & Sprint Presentation Walkthrough
-├── walkthrough.md                     ← Prototype Walkthrough & Verification Steps
-├── package.json                       ← Root NPM scripts
-├── vercel.json                        ← Vercel Serverless Deployment Manifest
-├── api/
-│   └── report.js                      ← Vercel Serverless API Endpoint (/api/report)
-├── public/                            ← Dashboard Web Application Assets
-│   ├── index.html                     ← Dashboard UI (Dark-mode SPA)
-│   ├── style.css                      ← Design System & Dashboard Styles
-│   └── app.js                         ← Dashboard Client Logic & Fetching
-└── aem-qa-tool/                       ← Core QA Engine & Build Scripts
-    ├── bookmarklet.js                 ← Master QA Engine (52 Checks + Side Panel UI)
-    ├── build-bookmarklet.js           ← Minifier & Bookmarklet Encoder
-    ├── build-cloud-bookmarklet.js     ← Cloud-ready Bookmarklet Generator
-    ├── build-standalone.js            ← Offline Self-contained Bookmarklet Generator
-    ├── server.local.js                ← Local Zero-Dependency HTTP Server (Port 3500)
-    ├── AEM_QA_BOOKMARK.txt            ← Compiled Bookmarklet (Cloud Endpoint)
-    ├── AEM_QA_BOOKMARK_LOCAL.txt      ← Compiled Bookmarklet (Localhost:3500)
-    └── AEM_QA_BOOKMARK_STANDALONE.txt ← Compiled Bookmarklet (In-memory engine)
-```
-
----
-
-## 🚀 Quick Start Guide
-
-### 1. Prerequisites
-- **Node.js**: v14.x or higher (v18+ recommended).
-- Modern web browser (Google Chrome, Microsoft Edge, Mozilla Firefox, or Apple Safari).
-
----
-
-### 2. Option A: Running the Local Server & Dashboard
-
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-   cd QA
-   ```
-
-2. **Start the local server & central dashboard**:
-   ```bash
-   npm start
-   ```
-   *Alternative directly from the `aem-qa-tool` subdirectory:*
-   ```bash
-   node aem-qa-tool/server.local.js
-   ```
-
-3. **Access the Central QA Dashboard**:
-   Open your browser to [`http://localhost:3500`](http://localhost:3500).
-
----
-
-### 3. Option B: Installing the Browser Bookmarklet (One-Time Setup)
-
-To audit any live page or AEM author/stage preview:
-
-1. Open one of the compiled bookmarklet text files depending on your setup:
-   - **Cloud/Vercel Mode**: Open [`AEM_QA_BOOKMARK.txt`](file:///c:/git-repo/QA/aem-qa-tool/AEM_QA_BOOKMARK.txt)
-   - **Local Mode**: Open [`AEM_QA_BOOKMARK_LOCAL.txt`](file:///c:/git-repo/QA/aem-qa-tool/AEM_QA_BOOKMARK_LOCAL.txt)
-2. Copy the entire contents of the text file (starts with `javascript:`).
-3. In your Web Browser:
-   - Open Bookmarks Manager (`Ctrl+Shift+O` or `Cmd+Option+B`).
-   - Add a new Bookmark.
-   - Set **Name**: `AEM QA Engine`.
-   - Set **URL**: Paste the copied `javascript:...` payload.
-4. Drag `AEM QA Engine` to your Bookmarks Bar for 1-click access.
-
----
-
-### 4. Running a Page Audit
-
-1. Navigate to any live website, AEM preview link, or author page (e.g., `https://author-pXXXX-eYYYY.adobeaemcloud.com/content/...html?wcmmode=disabled`).
-2. Click **`AEM QA Engine`** in your browser bookmarks bar.
-3. The interactive dark side panel will appear on the right side of the screen:
-   - Executes DOM checks in ~50ms.
-   - Batch-tests all page links & CTAs asynchronously in 5–10s.
-   - Displays weighted score, pass/fail badges, and P1 Hard Blockers.
-4. Click **`📡 Send to Server`** to push the audit results to your dashboard.
-
----
-
-## 🏛️ The 4 QA Audit Pillars
-
-| Pillar | Weight | Description | Key Checks |
-|---|---|---|---|
-| **Metadata & SEO** | 25% | Validates indexability, social sharing tags, and head structure | Title length, Meta Description, Canonical URL, OpenGraph tags, Hreflang, Robots tag |
-| **Content & Components** | 35% | Verifies DOM integrity, AEM author leaks, and link health | Heading order (H1-H6), Raw `/content/` paths, Stage/Dev domain leaks, Broken links, Image alt text |
-| **Responsive Layout** | 15% | Ensures multi-device usability and layout stability | Viewport meta, Mobile touch targets (min 44px), Horizonal scroll overflow, Grid/Flex wrap rules |
-| **Accessibility (a11y)** | 25% | Checks WCAG 2.1 AA compliance and ARIA patterns | Color contrast ratios, Form field labels, ARIA landmarks, Focus ring visibility, Keyboard access |
-
----
-
-## ☁️ Deployment & Hosting (Vercel Serverless)
-
-The project includes a production-ready configuration for Vercel deployment:
-
-- **Static Frontend**: Serves [`public/index.html`](file:///c:/git-repo/QA/public/index.html) as the global dashboard.
-- **Serverless API**: Routes `/api/report`, `/api/reports`, and `/api/report-details` to [`api/report.js`](file:///c:/git-repo/QA/api/report.js).
-
-To deploy to Vercel:
-```bash
-npx vercel
-```
-Or connect your Git repository to Vercel using the provided [`vercel.json`](file:///c:/git-repo/QA/vercel.json).
-
----
-
-## 🛠️ Building & Re-compiling Bookmarklets
-
-If you modify [`bookmarklet.js`](file:///c:/git-repo/QA/aem-qa-tool/bookmarklet.js), re-generate the bookmarklet payloads using the build scripts:
+## Quick start
 
 ```bash
-# Build cloud bookmarklet
-node aem-qa-tool/build-cloud-bookmarklet.js
+git clone <repository-url> && cd <repo>
+npm start                       # builds the bookmarklets, then serves on :3500
+```
 
-# Build local bookmarklet
-node aem-qa-tool/build-bookmarklet.js
+Open <http://localhost:3500>. There are no dependencies to install — `npm start`
+runs `scripts/build.js` first (via `prestart`) and then boots the server.
 
-# Build standalone offline bookmarklet
-node aem-qa-tool/build-standalone.js
+### Install the bookmarklet
+
+1. On the dashboard, click **Copy Code** (or drag **AEM QA Auditor** to your bookmarks bar).
+2. Navigate to any page — including an AEM author preview.
+3. Click the bookmark. The audit panel opens, checks run, and **Send to Server**
+   pushes the result to your dashboard.
+
+Three payload variants are produced in `dist/`:
+
+| File | Reports to | Use when |
+|---|---|---|
+| `AEM_QA_BOOKMARK_LOCAL.txt` | `http://localhost:3500` | Local development |
+| `AEM_QA_BOOKMARK_HOSTED.txt` | your `--endpoint` | Shared/team use |
+| `AEM_QA_BOOKMARK_LOADER.txt` | loads the engine over HTTP | Small bookmark field; **blocked by CSP on most production AEM sites** — prefer a self-contained payload there |
+
+```bash
+npm run build -- --endpoint https://<app>.up.railway.app/api/report
 ```
 
 ---
 
-## 📑 Complete Documentation Suite
+## The 4 audit pillars
 
-For detailed technical guides and architecture blueprints, refer to the project documentation files:
+| Pillar | Weight | Checks | Covers |
+|---|---:|---:|---|
+| **Metadata & SEO** | 25% | 12 | Title, description, canonical, OpenGraph, Twitter cards, robots, hreflang |
+| **Content & Components** | 35% | 19 | H1–H6 order, raw `/content/` paths, author/stage leaks, link + CTA health, image alt text |
+| **Responsive Layout** | 15% | 7 | Viewport meta, 44px touch targets, horizontal overflow, flex/grid wrapping |
+| **Accessibility (WCAG 2.1 AA)** | 25% | 11 | Colour contrast, form labels, ARIA landmarks and roles, focus visibility |
 
-1. 📘 [**QA Framework Technical Architecture Guide**](file:///c:/git-repo/QA/QA_FRAMEWORK_DOCUMENTATION.md): Complete architecture breakdown, 52-check reference matrix, server endpoints, and customizing checks.
-2. 📗 [**AEM QA Framework Implementation Guide**](file:///c:/git-repo/QA/AEM_QA_FRAMEWORK_GUIDE.md): Deep-dive reference code and step-by-step framework build manual.
-3. 📙 [**Sprint Demo Presentation Guide**](file:///c:/git-repo/QA/SPRINT_DEMO_PRESENTATION_GUIDE.md): Slide deck structure and live demonstration script.
+Scoring is priority-weighted (P1=4, P2=2, P3=1). Any failing **P1** check sets the
+verdict to `BLOCK` regardless of the numeric score.
+
+### A note on link checking
+
+Cross-origin links usually send no CORS headers, so a browser cannot read their
+status. The engine tries `HEAD`, then `GET`, then an opaque `no-cors` request; a
+link is only reported broken when it is genuinely unreachable. Links that are
+reachable but unreadable are counted separately as *unverified* rather than
+being failed — which is what previously produced false positives on essentially
+every external link.
 
 ---
 
-## 📜 License
+## Deploying to Railway
 
-This project is released under the **MIT License**.
+The server is a single long-lived Node process, so reports persist to disk.
+
+1. Create a Railway project from this repo. Nixpacks detects Node automatically;
+   `railway.toml` supplies the build, start and healthcheck configuration.
+2. **Attach a volume** (e.g. mounted at `/data`) and set `REPORTS_DIR=/data/reports`.
+   Without a volume, reports are lost on every redeploy.
+3. Set variables as needed (see `.env.example`):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | injected by Railway | Listen port |
+| `REPORTS_DIR` | `./reports` | Where reports are written — point at your volume |
+| `QA_API_TOKEN` | unset | When set, `POST /api/report` requires `X-QA-Token` |
+| `MAX_REPORTS` | `500` | Oldest reports pruned beyond this |
+
+4. Build the team bookmarklet against your deployment:
+
+```bash
+npm run build -- --endpoint https://<app>.up.railway.app/api/report --token "$QA_API_TOKEN"
+```
+
+`/health` returns `{ ok, reports, uptime }` for the Railway healthcheck.
+
+### Access model
+
+- **Writes** (`POST /api/report`) accept cross-origin requests — the bookmarklet
+  posts from whatever AEM origin the author is on. Set `QA_API_TOKEN` to require
+  a shared secret.
+- **Reads** (`/api/reports`, `/api/report-details`) deliberately emit no wildcard
+  CORS header, so only the same-origin dashboard can list or open reports. Audit
+  payloads embed internal author/stage URLs and page content.
+
+> If you expose the dashboard publicly, put Railway's access controls or an
+> authenticating proxy in front of it. The read endpoints are same-origin
+> protected, not authenticated.
+
+---
+
+## Project structure
+
+```
+├── server.js              Server: static dashboard + report API (Node core only)
+├── railway.toml           Railway build/deploy/healthcheck manifest
+├── .env.example           Documented environment variables
+├── src/
+│   └── bookmarklet.js     The QA engine — single source of truth
+├── scripts/
+│   └── build.js           Compiles the engine into its deployable payloads
+├── public/                Dashboard SPA (index.html, app.js, style.css)
+├── test/
+│   └── smoke.test.js      Dependency-free smoke tests (npm test)
+├── dist/                  Generated bookmarklet payloads (gitignored)
+└── docs/                  Architecture, implementation and presentation guides
+```
+
+Generated files (`dist/`, `public/bookmarklet.js`) are gitignored and rebuilt by
+`npm run build`. Edit `src/bookmarklet.js`, never the generated output.
+
+---
+
+## Configuration
+
+Override engine behaviour per-site without editing it, by setting
+`window.__AEM_QA_CONFIG__` before the engine runs:
+
+```js
+window.__AEM_QA_CONFIG__ = {
+  ui: 'toast',                  // 'panel' (default) or fire-and-forget 'toast'
+  autoSend: true,               // send without clicking, in panel mode
+  reportServer: 'https://…/api/report',
+  apiToken: '…',                // when the server sets QA_API_TOKEN
+  thresholdScore: 85,
+  selectors: { cta: ['a.my-button'] },   // defaults target KONE + AEM Core Components
+  weights: { accessibility: 0.35 }
+};
+```
+
+The default selectors are tuned for KONE and AEM Core Components; retune
+`selectors` for other sites so component checks do not under-detect.
+
+---
+
+## API
+
+| Method | Endpoint | Notes |
+|---|---|---|
+| `POST` | `/api/report` | Save a report. Cross-origin allowed; token-gated when configured |
+| `GET` | `/api/reports` | Report summaries, newest first. Same-origin |
+| `GET` | `/api/report-details?id=` | One full report; `404` when unknown. Same-origin |
+| `GET` | `/api/bookmarklet?variant=` | Current compiled payload (`hosted` \| `local`) |
+| `GET` | `/health` | Liveness probe |
+
+---
+
+## Testing
+
+```bash
+npm test
+```
+
+Covers payload compilation, the report round-trip, path-traversal rejection and
+the CORS split. <a id="technology"></a>
+
+---
+
+## Technology
+
+Vanilla JavaScript and Node core APIs only — **no npm dependencies**, no build
+toolchain, no webfont CDN. The dashboard works offline and under a strict CSP.
+
+---
+
+## Documentation
+
+- [Technical architecture guide](./docs/QA_FRAMEWORK_DOCUMENTATION.md)
+- [Implementation guide](./docs/AEM_QA_FRAMEWORK_GUIDE.md)
+- [Stakeholder overview](./docs/STAKEHOLDER_QA_OVERVIEW.md)
+- [Sprint demo guide](./docs/SPRINT_DEMO_PRESENTATION_GUIDE.md)
+- [Prototype walkthrough](./docs/walkthrough.md)
+
+---
+
+## License
+
+MIT.

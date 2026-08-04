@@ -1,14 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AEM QA Framework — Cloud Audit Hub</title>
+  <title>AEM QA Framework — Audit Hub</title>
   <link rel="stylesheet" href="style.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Inline favicon: avoids a 404 on every page load without adding a binary
+       asset to the repo. -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>%E2%9A%A1</text></svg>">
+  <!-- No webfont CDN: the dashboard is self-hosted and dependency-free, so it
+       renders identically on an air-gapped network and under a strict CSP.
+       style.css falls back to the platform UI font stack. -->
 </head>
+
 <body>
   <div class="app-container">
     <!-- Top Navigation -->
@@ -30,12 +35,13 @@
       <div class="launcher-card">
         <div class="launcher-text">
           <h2>🎯 Audit Any AEM Page or Website</h2>
-          <p>Paste a live site URL or unreleased AEM Preview link below to open and audit.</p>
+          <p>Paste a live site URL or AEM preview link below. Launching here enables direct communication between this dashboard and the target page.</p>
         </div>
 
         <div class="launcher-input-row">
-          <input type="url" id="target-url-input" placeholder="Paste URL here (e.g. https://www.kone.com or AEM preview link)...">
-          <button id="launch-audit-btn" class="btn primary-launch">🚀 Open & Audit Page</button>
+          <input type="url" id="target-url-input"
+            placeholder="Paste URL here (e.g. https://www.kone.com or AEM preview link)...">
+          <button id="launch-audit-btn" class="btn primary-launch" onclick="(function(){var u=document.getElementById('target-url-input').value.trim();if(!u)return;if(!/^https?:\/\//i.test(u))u='https://'+u;window.open(u,'_blank');})()">🚀 Open &amp; Audit Page</button>
         </div>
 
         <div class="bookmarklet-installer">
@@ -67,7 +73,8 @@
         <div class="empty-state">
           <div class="empty-icon">📊</div>
           <h3>Select an Audit Report</h3>
-          <p>Choose a report from the sidebar to inspect detailed pillar scores, P1 blocks, and quality check findings.</p>
+          <p>Choose a report from the sidebar to inspect detailed pillar scores, P1 blocks, and quality check findings.
+          </p>
         </div>
       </section>
     </main>
@@ -75,4 +82,5 @@
 
   <script src="app.js"></script>
 </body>
+
 </html>

@@ -10,7 +10,9 @@
   --pass-green: #10B981;
   --warn-amber: #F59E0B;
   --fail-red: #EF4444;
-  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  /* Platform UI stack — matches Inter closely on every OS without a CDN fetch.
+     'Inter' is kept first so a locally installed copy is still preferred. */
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 * {

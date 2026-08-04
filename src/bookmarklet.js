@@ -3,24 +3,61 @@
 
   var TOAST_ID = 'aem-qa-toast';
 
+  // ─── ENDPOINT RESOLUTION ────────────────────────────────────────────
+  // Precedence: explicit override > remote <script> origin > build-injected
+  // default > localhost. '__QA_ENDPOINT__' is substituted by scripts/build.js;
+  // when it survives unsubstituted we are running from source, so ignore it.
+  var BUILD_ENDPOINT = '__QA_ENDPOINT__';
+  var userConfig = window.__AEM_QA_CONFIG__ || {};
+
+  function resolveEndpoint() {
+    if (userConfig.reportServer) return userConfig.reportServer;
+
+    // Loaded as a remote <script>? Report back to the origin that served us.
+    var tag = document.currentScript;
+    if (tag && tag.src && tag.src.indexOf('http') === 0) {
+      try { return new URL(tag.src).origin + '/api/report'; } catch (e) {}
+    }
+
+    if (BUILD_ENDPOINT.indexOf('__QA_') !== 0) return BUILD_ENDPOINT;
+    return 'http://localhost:3500/api/report';
+  }
+
+  var reportServerUrl = resolveEndpoint();
+
+  // Origin used to target postMessage. Never post audit data to '*'.
+  var reportOrigin = (function () {
+    try { return new URL(reportServerUrl, location.href).origin; } catch (e) { return null; }
+  })();
+
   // ─── CONFIG ─────────────────────────────────────────────────────────
   var CONFIG = {
-    version: '2.0.0',
+    version: '3.0.0',
+    panelId: 'aem-qa-panel',
     thresholdScore: 80,
     linkBatchSize: 5,
     linkTimeout: 5000,
-    reportServer: 'https://qa-mu-gules.vercel.app/api/report',
+    reportServer: reportServerUrl,
+    reportOrigin: reportOrigin,
+
+    // 'panel' = interactive side panel (default). 'toast' = fire-and-forget:
+    // run, show a small toast, auto-send, no panel.
+    ui: userConfig.ui === 'toast' ? 'toast' : 'panel',
+    autoSend: userConfig.autoSend === true,
+
+    // Optional shared secret, required only when the server sets QA_API_TOKEN.
+    apiToken: userConfig.apiToken || null,
 
     selectors: {
       header: '.kone-header, header, [role="banner"]',
-      nav:    'nav, [role="navigation"], .kone-header__main-menu',
-      main:   'main, [role="main"], #main-content, #content',
+      nav: 'nav, [role="navigation"], .kone-header__main-menu',
+      main: 'main, [role="main"], #main-content, #content',
       cta: [
         'a[class*="cta"]', 'a[class*="button"]', 'a[class*="btn"]',
         '.cmp-button a', '.cmp-teaser__link',
         'button[class*="cta"]', 'a[class*="kone-button"]', '.kone-button', '.kone-icon-button'
       ],
-      image:    '.cmp-image img, [data-cmp-is="image"] img, img',
+      image: '.cmp-image img, [data-cmp-is="image"] img, img',
       richtext: '.cmp-text, [class*="richtext"], [class*="rich-text"]',
     },
 
@@ -47,63 +84,36 @@
     }
   };
 
-  // ─── PREVENT DOUBLE RUN ──────────────────────────────────────────────
-  if (document.getElementById(TOAST_ID)) return;
-
-  // ─── TOAST UI ────────────────────────────────────────────────────────
-  function injectToast() {
-    var style = document.createElement('style');
-    style.id = 'aem-qa-toast-style';
-    style.textContent = [
-      '@keyframes qa-slide{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}',
-      '@keyframes qa-fade{from{opacity:1}to{opacity:0}}',
-      '#aem-qa-toast{position:fixed;bottom:24px;right:24px;width:288px;',
-      'background:#0A0F1E;color:#F9FAFB;border:1px solid #1450F5;border-radius:12px;',
-      'padding:14px 18px;font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;',
-      'font-size:13px;z-index:2147483647;box-shadow:0 8px 32px rgba(0,0,0,0.65);',
-      'animation:qa-slide 0.3s ease;line-height:1.6;}',
-      '#aem-qa-toast.qa-done{animation:qa-fade 0.5s ease 3.5s forwards;}',
-      '#aem-qa-toast .qa-t-title{font-weight:700;font-size:14px;color:#fff;margin-bottom:4px;}',
-      '#aem-qa-toast .qa-t-msg{color:#9CA3AF;font-size:12px;min-height:16px;}',
-      '#aem-qa-toast .qa-t-bar{height:3px;background:#1F2937;border-radius:2px;margin-top:10px;overflow:hidden;}',
-      '#aem-qa-toast .qa-t-fill{height:100%;background:#1450F5;border-radius:2px;transition:width 0.4s ease;}'
-    ].join('');
-    document.head.appendChild(style);
-
-    var toast = document.createElement('div');
-    toast.id = TOAST_ID;
-    toast.innerHTML = [
-      '<div class="qa-t-title">⚡ AEM QA Auditor</div>',
-      '<div class="qa-t-msg" id="qa-t-msg">🔄 Running checks…</div>',
-      '<div class="qa-t-bar"><div class="qa-t-fill" id="qa-t-fill" style="width:5%"></div></div>'
-    ].join('');
-    document.body.appendChild(toast);
+  // Per-site overrides. The default selectors are tuned for KONE + AEM Core
+  // Components; any site can retune them without editing the engine by setting
+  // window.__AEM_QA_CONFIG__ = { selectors: { cta: [...] } } before running.
+  if (userConfig.selectors) {
+    Object.keys(userConfig.selectors).forEach(function (k) {
+      CONFIG.selectors[k] = userConfig.selectors[k];
+    });
   }
+  if (userConfig.weights) {
+    Object.keys(userConfig.weights).forEach(function (k) {
+      CONFIG.weights[k] = userConfig.weights[k];
+    });
+  }
+  if (typeof userConfig.thresholdScore === 'number') CONFIG.thresholdScore = userConfig.thresholdScore;
+  if (typeof userConfig.linkTimeout === 'number') CONFIG.linkTimeout = userConfig.linkTimeout;
+  if (typeof userConfig.linkBatchSize === 'number') CONFIG.linkBatchSize = userConfig.linkBatchSize;
 
-  function updateToast(msg, progress, isError, isDone) {
-    var msgEl  = document.getElementById('qa-t-msg');
-    var fillEl = document.getElementById('qa-t-fill');
-    var toast  = document.getElementById(TOAST_ID);
-    if (!toast) return;
-    if (msgEl)  msgEl.textContent = msg;
-    if (fillEl && progress !== undefined) fillEl.style.width = progress + '%';
-    if (isError) {
-      toast.style.borderColor = '#EF4444';
-      if (fillEl) fillEl.style.background = '#EF4444';
-    }
-    if (isDone && !isError) {
-      toast.style.borderColor = '#10B981';
-      if (fillEl) fillEl.style.background = '#10B981';
-    }
-    if (isDone) {
-      toast.classList.add('qa-done');
-      setTimeout(function() {
-        var t = document.getElementById(TOAST_ID);
-        var s = document.getElementById('aem-qa-toast-style');
-        if (t) t.remove();
-        if (s) s.remove();
-      }, 4200);
-    }
+  // ─── PREVENT DOUBLE INJECTION ───────────────────────────────────────
+  // Re-running the bookmarklet on an already-audited page tears the previous
+  // run down instead of stacking a second panel/toast on top of it.
+  var priorPanel = document.getElementById(CONFIG.panelId);
+  var priorToast = document.getElementById(TOAST_ID);
+  if (priorPanel || priorToast) {
+    if (priorPanel) priorPanel.remove();
+    if (priorToast) priorToast.remove();
+    ['aem-qa-styles', 'aem-qa-toast-style'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.remove();
+    });
+    return;
   }
 
   var results = {
@@ -122,9 +132,11 @@
     goNoGo: { status: 'CHECKING', reason: 'Running checks...' }
   };
 
-  injectToast();
-  runPhase1();
-  runPhase2();
+  // NOTE: the audit is started at the very bottom of this IIFE, after every
+  // declaration has been evaluated. Booting from here instead would run before
+  // `var PRIORITY_WEIGHTS` (and friends) are assigned — `var` hoists the
+  // binding but not the value — so scoring threw
+  // "Cannot read properties of undefined (reading 'P1')" on every single run.
 
   // ─── UTILITY FUNCTIONS ──────────────────────────────────────────────
 
@@ -158,18 +170,33 @@
 
   function updateLinkProgress(done, total) {
     var pct = total > 0 ? Math.round((done / total) * 100) : 100;
-    var msg = total === 0
-      ? '✅ No internal links to check'
-      : '🔗 Checking links… ' + done + '/' + total + ' (' + pct + '%)';
-    // Map link check progress to 40–85% of the overall toast progress bar
-    var toastPct = total === 0 ? 85 : Math.round(40 + (pct * 0.45));
-    updateToast(msg, toastPct);
+
+    if (CONFIG.ui === 'toast') {
+      // Link checking occupies the 40–90% band of the toast progress bar.
+      updateToast('🔗 Checking links… ' + done + '/' + total, 40 + Math.round(pct * 0.5));
+      return;
+    }
+
+    var pbar = document.getElementById('qa-pbar-fill');
+    var progText = document.getElementById('qa-progress-text');
+    if (pbar) pbar.style.width = pct + '%';
+    if (progText) {
+      progText.textContent = total === 0 ? 'Link check completed' : 'Checking links… ' + done + '/' + total + ' (' + pct + '%)';
+    }
+    if (done >= total && total > 0) {
+      var container = document.getElementById('qa-progress');
+      if (container) {
+        setTimeout(function () {
+          container.style.display = 'none';
+        }, 1500);
+      }
+    }
   }
 
   function checkColorContrast() {
     var issues = [];
     var textEls = Array.from(document.querySelectorAll('p, h1, h2, h3, h4, li, a, span, td')).slice(0, 30);
-    textEls.forEach(function(el) {
+    textEls.forEach(function (el) {
       var styles = window.getComputedStyle(el);
       var color = styles.color;
       var bg = styles.backgroundColor;
@@ -211,12 +238,12 @@
   // ─── PHASE 1: SYNCHRONOUS DOM CHECKS ────────────────────────────────
 
   function runPhase1() {
-    results.metadata      = checkMetadata();
-    results.content       = checkContent();
-    results.responsive    = checkResponsive();
+    results.metadata = checkMetadata();
+    results.content = checkContent();
+    results.responsive = checkResponsive();
     results.accessibility = checkAccessibility();
     finalizeScores();
-    updateToast('🔗 Checking links… (may take a few seconds)', 40);
+    renderPartialResults();
   }
 
   function checkMetadata() {
@@ -236,7 +263,7 @@
       id: 'M-02', pillar: 'metadata', priority: 'P2',
       label: 'Title length (10–60 chars)',
       status: title.length >= 10 && title.length <= 60 ? 'pass'
-            : title.length > 60 ? 'warn' : 'fail',
+        : title.length > 60 ? 'warn' : 'fail',
       detail: title.length + ' characters' + (title.length > 60 ? ' — may be truncated in SERPs' : ''),
     });
 
@@ -268,7 +295,7 @@
       id: 'M-05', pillar: 'metadata', priority: 'P2',
       label: 'Meta description length (50–160)',
       status: descLen >= 50 && descLen <= 160 ? 'pass'
-            : descLen > 160 ? 'warn' : (descLen > 0 ? 'warn' : 'fail'),
+        : descLen > 160 ? 'warn' : (descLen > 0 ? 'warn' : 'fail'),
       detail: descLen > 0 ? descLen + ' characters' : 'Not set',
     });
 
@@ -289,7 +316,7 @@
       id: 'M-07', pillar: 'metadata', priority: 'P2',
       label: 'Canonical matches page URL',
       status: !canonHref ? 'fail'
-            : canonUrl === pageUrl ? 'pass' : 'warn',
+        : canonUrl === pageUrl ? 'pass' : 'warn',
       detail: canonHref
         ? (canonUrl === pageUrl ? 'Matches' : 'Mismatch: canonical="' + canonUrl + '" vs page="' + pageUrl + '"')
         : 'No canonical to check',
@@ -362,7 +389,7 @@
       detail: h1s.length === 0
         ? 'No <h1> found — critical SEO and accessibility failure'
         : h1s.length + ' H1 elements found',
-      items: h1s.map(function(h) {
+      items: h1s.map(function (h) {
         return {
           text: h.textContent.trim().substring(0, 40),
           path: getPath(h)
@@ -383,7 +410,7 @@
     var headings = Array.from(document.querySelectorAll('h1,h2,h3,h4,h5,h6'));
     var hierarchyIssues = [];
     var prevLevel = 0;
-    headings.forEach(function(h) {
+    headings.forEach(function (h) {
       var level = parseInt(h.tagName[1]);
       if (prevLevel > 0 && level > prevLevel + 1) {
         hierarchyIssues.push(
@@ -400,7 +427,7 @@
       detail: hierarchyIssues.length === 0
         ? 'Hierarchy is correct'
         : hierarchyIssues.length + ' skip(s) found',
-      items: hierarchyIssues.map(function(i) { return { text: i }; })
+      items: hierarchyIssues.map(function (i) { return { text: i }; })
     });
 
     // C-04 — No placeholder content (P1)
@@ -417,7 +444,7 @@
 
     // C-05 — Images missing alt attribute (P2)
     var allImgs = Array.from(document.querySelectorAll('img'));
-    var missingAlt = allImgs.filter(function(img) {
+    var missingAlt = allImgs.filter(function (img) {
       return !img.hasAttribute('alt');
     });
     r.push({
@@ -427,13 +454,13 @@
       detail: missingAlt.length === 0
         ? 'All ' + allImgs.length + ' images have alt'
         : missingAlt.length + ' image(s) missing alt attribute',
-      items: missingAlt.map(function(img) {
+      items: missingAlt.map(function (img) {
         return { text: img.src ? img.src.split('/').pop() : '[no src]', path: getPath(img) };
       })
     });
 
     // C-06 — Invalid alt/ syntax (AEM-specific bug) (P2)
-    var invalidAlt = allImgs.filter(function(img) {
+    var invalidAlt = allImgs.filter(function (img) {
       return img.getAttribute('alt') === null && img.outerHTML.indexOf('alt/') > -1;
     });
     r.push({
@@ -446,7 +473,7 @@
     });
 
     // C-07 — Decorative images (P4, informational)
-    var decorativeImgs = allImgs.filter(function(img) {
+    var decorativeImgs = allImgs.filter(function (img) {
       return img.getAttribute('alt') === '';
     });
     r.push({
@@ -460,7 +487,7 @@
     var allLinks = Array.from(document.querySelectorAll('a[href]'));
 
     // C-09 — AEM content paths in links (P1)
-    var aemPathLinks = allLinks.filter(function(a) {
+    var aemPathLinks = allLinks.filter(function (a) {
       return CONFIG.aemPathPattern.test(a.getAttribute('href') || '');
     });
     r.push({
@@ -470,15 +497,15 @@
       detail: aemPathLinks.length === 0
         ? 'No raw AEM paths found'
         : aemPathLinks.length + ' link(s) with /content/ path — will 404 on publish',
-      items: aemPathLinks.map(function(a) {
+      items: aemPathLinks.map(function (a) {
         return { text: a.getAttribute('href'), element: getPath(a) };
       })
     });
 
     // C-10 — Author/Stage/Dev env URLs in links (P1)
-    var envLinks = allLinks.filter(function(a) {
+    var envLinks = allLinks.filter(function (a) {
       var href = a.getAttribute('href') || '';
-      return CONFIG.envPatterns.some(function(p) { return p.test(href); });
+      return CONFIG.envPatterns.some(function (p) { return p.test(href); });
     });
     r.push({
       id: 'C-10', pillar: 'content', priority: 'P1',
@@ -487,17 +514,17 @@
       detail: envLinks.length === 0
         ? 'No environment URLs found'
         : envLinks.length + ' link(s) pointing to author/stage/dev environment',
-      items: envLinks.map(function(a) {
+      items: envLinks.map(function (a) {
         return { text: a.getAttribute('href'), element: getPath(a) };
       })
     });
 
     // C-11 — External links missing rel="noopener" (P3)
-    var extLinks = allLinks.filter(function(a) {
+    var extLinks = allLinks.filter(function (a) {
       var href = a.getAttribute('href') || '';
       return a.getAttribute('target') === '_blank' && href.indexOf('http') === 0;
     });
-    var noOpener = extLinks.filter(function(a) {
+    var noOpener = extLinks.filter(function (a) {
       return (a.getAttribute('rel') || '').indexOf('noopener') === -1;
     });
     r.push({
@@ -507,13 +534,13 @@
       detail: noOpener.length === 0
         ? 'All ' + extLinks.length + ' external links have rel="noopener"'
         : noOpener.length + ' external link(s) missing rel="noopener"',
-      items: noOpener.map(function(a) {
+      items: noOpener.map(function (a) {
         return { text: a.textContent.trim() || a.getAttribute('href'), element: getPath(a) };
       })
     });
 
     // C-12 — Dead hash-only anchors (P2)
-    var hashAnchors = allLinks.filter(function(a) {
+    var hashAnchors = allLinks.filter(function (a) {
       return a.getAttribute('href') === '#';
     });
     r.push({
@@ -523,13 +550,13 @@
       detail: hashAnchors.length === 0
         ? 'No empty anchors found'
         : hashAnchors.length + ' link(s) with href="#"',
-      items: hashAnchors.map(function(a) {
+      items: hashAnchors.map(function (a) {
         return { text: a.textContent.trim() || '[no text]', element: getPath(a) };
       })
     });
 
     // C-13 — Empty links (P1)
-    var emptyLinks = allLinks.filter(function(a) {
+    var emptyLinks = allLinks.filter(function (a) {
       var text = a.textContent.trim();
       var label = a.getAttribute('aria-label') || a.getAttribute('title') || '';
       var hasVisibleContent = a.querySelector('img[alt]:not([alt=""])');
@@ -542,7 +569,7 @@
       detail: emptyLinks.length === 0
         ? 'All links have accessible text'
         : emptyLinks.length + ' link(s) have no text, no aria-label',
-      items: emptyLinks.map(function(a) {
+      items: emptyLinks.map(function (a) {
         return { text: a.getAttribute('href'), element: getPath(a) };
       })
     });
@@ -551,9 +578,9 @@
     var ctaEls = getCTAs();
 
     // C-15 — Generic CTA text (P3)
-    var genericCTAs = ctaEls.filter(function(el) {
+    var genericCTAs = ctaEls.filter(function (el) {
       var text = el.textContent.trim().toLowerCase();
-      return CONFIG.genericCtaText.some(function(g) { return text === g; });
+      return CONFIG.genericCtaText.some(function (g) { return text === g; });
     });
     r.push({
       id: 'C-15', pillar: 'content', priority: 'P3',
@@ -562,7 +589,7 @@
       detail: genericCTAs.length === 0
         ? 'All ' + ctaEls.length + ' CTAs have descriptive text'
         : genericCTAs.length + ' CTA(s) with generic text — add aria-label',
-      items: genericCTAs.map(function(el) {
+      items: genericCTAs.map(function (el) {
         return {
           text: '"' + el.textContent.trim() + '"',
           element: getPath(el),
@@ -572,7 +599,7 @@
     });
 
     // C-16 — CTAs have accessible label (P2)
-    var iconOnlyCTAs = ctaEls.filter(function(el) {
+    var iconOnlyCTAs = ctaEls.filter(function (el) {
       var text = el.textContent.trim();
       var label = el.getAttribute('aria-label') || el.getAttribute('title') || '';
       return !text && !label;
@@ -584,7 +611,7 @@
       detail: iconOnlyCTAs.length === 0
         ? 'All icon-only CTAs are labelled'
         : iconOnlyCTAs.length + ' icon-only CTA(s) missing aria-label',
-      items: iconOnlyCTAs.map(function(el) {
+      items: iconOnlyCTAs.map(function (el) {
         return { text: el.outerHTML.substring(0, 80), element: getPath(el) };
       })
     });
@@ -595,7 +622,7 @@
       label: 'CTA inventory',
       status: 'info',
       detail: ctaEls.length + ' CTA element(s) found',
-      items: ctaEls.map(function(el) {
+      items: ctaEls.map(function (el) {
         return { text: el.textContent.trim() || '[icon-only]', href: el.getAttribute('href') || el.tagName };
       })
     });
@@ -604,7 +631,7 @@
     var inputs = Array.from(document.querySelectorAll(
       'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, select'
     ));
-    var unlabelledInputs = inputs.filter(function(inp) {
+    var unlabelledInputs = inputs.filter(function (inp) {
       var id = inp.getAttribute('id');
       var label = id ? document.querySelector('label[for="' + id + '"]') : null;
       var ariaLabel = inp.getAttribute('aria-label');
@@ -616,9 +643,9 @@
       label: 'Form inputs have labels',
       status: unlabelledInputs.length === 0 ? 'pass' : 'fail',
       detail: inputs.length === 0 ? 'No form inputs on page'
-            : unlabelledInputs.length === 0 ? 'All ' + inputs.length + ' inputs are labelled'
-            : unlabelledInputs.length + ' input(s) missing label',
-      items: unlabelledInputs.map(function(inp) {
+        : unlabelledInputs.length === 0 ? 'All ' + inputs.length + ' inputs are labelled'
+          : unlabelledInputs.length + ' input(s) missing label',
+      items: unlabelledInputs.map(function (inp) {
         return { text: inp.getAttribute('type') || inp.tagName, element: getPath(inp) };
       })
     });
@@ -630,7 +657,7 @@
       label: 'Embeds inventory',
       status: 'info',
       detail: embeds.length + ' embed(s) found',
-      items: embeds.map(function(el) {
+      items: embeds.map(function (el) {
         return { text: el.tagName, src: el.getAttribute('src') || el.getAttribute('data-src') || 'no src' };
       })
     });
@@ -665,7 +692,7 @@
 
     // R-05 — Touch targets >= 44x44px (P2)
     var interactiveEls = Array.from(document.querySelectorAll('a, button, [role="button"], input, select'));
-    var smallTargets = interactiveEls.filter(function(el) {
+    var smallTargets = interactiveEls.filter(function (el) {
       var rect = el.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0 && (rect.width < 44 || rect.height < 44);
     });
@@ -676,7 +703,7 @@
       detail: smallTargets.length === 0
         ? 'All ' + interactiveEls.length + ' interactive elements meet touch target size'
         : smallTargets.length + ' element(s) smaller than 44x44px',
-      items: smallTargets.slice(0, 10).map(function(el) {
+      items: smallTargets.slice(0, 10).map(function (el) {
         var rect = el.getBoundingClientRect();
         return {
           text: el.textContent.trim().substring(0, 30) || el.tagName,
@@ -696,7 +723,7 @@
     });
 
     // R-07 — Image overflow (P3)
-    var imgOverflows = Array.from(document.querySelectorAll('img')).filter(function(img) {
+    var imgOverflows = Array.from(document.querySelectorAll('img')).filter(function (img) {
       return img.getBoundingClientRect().width > window.innerWidth;
     });
     r.push({
@@ -710,7 +737,7 @@
 
     // R-08 — srcset coverage (P4)
     var allImgs = Array.from(document.querySelectorAll('img'));
-    var withSrcset = allImgs.filter(function(img) { return img.hasAttribute('srcset'); });
+    var withSrcset = allImgs.filter(function (img) { return img.hasAttribute('srcset'); });
     var coverage = allImgs.length > 0 ? Math.round((withSrcset.length / allImgs.length) * 100) : 100;
     r.push({
       id: 'R-08', pillar: 'responsive', priority: 'P4',
@@ -762,7 +789,7 @@
     // A-04 — Focus visible (P2)
     var focusIssues = [];
     var focusableEls = Array.from(document.querySelectorAll('a, button, input, [tabindex]')).slice(0, 20);
-    focusableEls.forEach(function(el) {
+    focusableEls.forEach(function (el) {
       var styles = window.getComputedStyle(el);
       if (styles.outlineStyle === 'none' && styles.outlineWidth === '0px') {
         var boxShadow = styles.boxShadow;
@@ -786,7 +813,7 @@
 
     // A-05 — Negative tabindex on content (P2)
     var allTabIndex = Array.from(document.querySelectorAll('[tabindex]'));
-    var negativeTabIndex = allTabIndex.filter(function(el) {
+    var negativeTabIndex = allTabIndex.filter(function (el) {
       var ti = parseInt(el.getAttribute('tabindex'));
       var isInteractive = ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].indexOf(el.tagName) > -1;
       return ti < 0 && !isInteractive;
@@ -798,22 +825,22 @@
       detail: negativeTabIndex.length === 0
         ? 'No problematic negative tabindex values'
         : negativeTabIndex.length + ' content element(s) with tabindex="-1"',
-      items: negativeTabIndex.slice(0, 5).map(function(el) {
+      items: negativeTabIndex.slice(0, 5).map(function (el) {
         return { text: el.tagName + ': ' + el.className.substring(0, 40), element: getPath(el) };
       })
     });
 
     // A-06 — ARIA roles valid (P3)
-    var validRoles = ['alert','alertdialog','application','article','banner','button','cell','checkbox',
-      'columnheader','combobox','complementary','contentinfo','definition','dialog','directory','document',
-      'feed','figure','form','grid','gridcell','group','heading','img','link','list','listbox','listitem',
-      'log','main','marquee','math','menu','menubar','menuitem','menuitemcheckbox','menuitemradio',
-      'navigation','none','note','option','presentation','progressbar','radio','radiogroup','region',
-      'row','rowgroup','rowheader','scrollbar','search','searchbox','separator','slider','spinbutton',
-      'status','switch','tab','table','tablist','tabpanel','term','textbox','timer','toolbar','tooltip',
-      'tree','treegrid','treeitem'];
+    var validRoles = ['alert', 'alertdialog', 'application', 'article', 'banner', 'button', 'cell', 'checkbox',
+      'columnheader', 'combobox', 'complementary', 'contentinfo', 'definition', 'dialog', 'directory', 'document',
+      'feed', 'figure', 'form', 'grid', 'gridcell', 'group', 'heading', 'img', 'link', 'list', 'listbox', 'listitem',
+      'log', 'main', 'marquee', 'math', 'menu', 'menubar', 'menuitem', 'menuitemcheckbox', 'menuitemradio',
+      'navigation', 'none', 'note', 'option', 'presentation', 'progressbar', 'radio', 'radiogroup', 'region',
+      'row', 'rowgroup', 'rowheader', 'scrollbar', 'search', 'searchbox', 'separator', 'slider', 'spinbutton',
+      'status', 'switch', 'tab', 'table', 'tablist', 'tabpanel', 'term', 'textbox', 'timer', 'toolbar', 'tooltip',
+      'tree', 'treegrid', 'treeitem'];
     var roleEls = Array.from(document.querySelectorAll('[role]'));
-    var invalidRoles = roleEls.filter(function(el) {
+    var invalidRoles = roleEls.filter(function (el) {
       return validRoles.indexOf(el.getAttribute('role')) === -1;
     });
     r.push({
@@ -823,17 +850,17 @@
       detail: invalidRoles.length === 0
         ? 'All ' + roleEls.length + ' role attributes are valid'
         : invalidRoles.length + ' invalid ARIA role(s)',
-      items: invalidRoles.map(function(el) {
+      items: invalidRoles.map(function (el) {
         return { text: 'role="' + el.getAttribute('role') + '"', element: getPath(el) };
       })
     });
 
     // A-07 — aria-expanded on toggle buttons (P3)
-    var toggleBtns = Array.from(document.querySelectorAll('button, [role="button"]')).filter(function(btn) {
+    var toggleBtns = Array.from(document.querySelectorAll('button, [role="button"]')).filter(function (btn) {
       var controls = btn.getAttribute('aria-controls');
       return controls && document.getElementById(controls);
     });
-    var missingExpanded = toggleBtns.filter(function(btn) {
+    var missingExpanded = toggleBtns.filter(function (btn) {
       return !btn.hasAttribute('aria-expanded');
     });
     r.push({
@@ -847,7 +874,7 @@
 
     // A-08 — Icon-only buttons have aria-label (P2)
     var buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
-    var iconBtns = buttons.filter(function(btn) {
+    var iconBtns = buttons.filter(function (btn) {
       var text = btn.textContent.trim();
       var label = btn.getAttribute('aria-label') || btn.getAttribute('title') || '';
       return !text && !label;
@@ -859,14 +886,14 @@
       detail: iconBtns.length === 0
         ? 'All icon buttons are labelled'
         : iconBtns.length + ' icon-only button(s) missing aria-label',
-      items: iconBtns.slice(0, 5).map(function(btn) {
+      items: iconBtns.slice(0, 5).map(function (btn) {
         return { text: btn.className.substring(0, 50), element: getPath(btn) };
       })
     });
 
     // A-09 — Decorative SVGs are aria-hidden (P3)
     var svgs = Array.from(document.querySelectorAll('svg'));
-    var svgsWithoutHidden = svgs.filter(function(svg) {
+    var svgsWithoutHidden = svgs.filter(function (svg) {
       var hasTitle = svg.querySelector('title');
       var hasLabel = svg.getAttribute('aria-label');
       var isHidden = svg.getAttribute('aria-hidden') === 'true';
@@ -883,7 +910,7 @@
 
     // A-11 — No auto-playing media (P2)
     var autoplayMedia = Array.from(document.querySelectorAll('video[autoplay], audio[autoplay]'));
-    var uncontrolled = autoplayMedia.filter(function(el) {
+    var uncontrolled = autoplayMedia.filter(function (el) {
       return !el.hasAttribute('controls');
     });
     r.push({
@@ -906,7 +933,7 @@
 
     // A-13 — Empty anchor links (P1)
     var allLinks = Array.from(document.querySelectorAll('a'));
-    var emptyAnchors = allLinks.filter(function(a) {
+    var emptyAnchors = allLinks.filter(function (a) {
       var text = a.textContent.trim();
       var label = a.getAttribute('aria-label') || a.getAttribute('title') || '';
       var imgWithAlt = a.querySelector('img[alt]:not([alt=""])');
@@ -919,7 +946,7 @@
       detail: emptyAnchors.length === 0
         ? 'All links have accessible text'
         : emptyAnchors.length + ' link(s) with no text and no aria-label',
-      items: emptyAnchors.slice(0, 5).map(function(a) {
+      items: emptyAnchors.slice(0, 5).map(function (a) {
         return { text: a.getAttribute('href'), element: getPath(a) };
       })
     });
@@ -932,8 +959,8 @@
   async function runPhase2() {
     var allLinks = Array.from(document.querySelectorAll('a[href]'));
     var internalLinks = allLinks
-      .map(function(a) { return { el: a, href: a.getAttribute('href') }; })
-      .filter(function(item) {
+      .map(function (a) { return { el: a, href: a.getAttribute('href') }; })
+      .filter(function (item) {
         var href = item.href;
         if (!href) return false;
         if (href.charAt(0) === '#') return false;
@@ -941,7 +968,7 @@
         if (href.indexOf('http') === 0 && href.indexOf(location.origin) !== 0) return false;
         return true;
       })
-      .map(function(item) {
+      .map(function (item) {
         return {
           el: item.el,
           href: item.href.charAt(0) === '/' ? location.origin + item.href : item.href,
@@ -950,7 +977,7 @@
       });
 
     var seenHrefs = {};
-    var uniqueLinks = internalLinks.filter(function(l) {
+    var uniqueLinks = internalLinks.filter(function (l) {
       if (seenHrefs[l.href]) return false;
       seenHrefs[l.href] = true;
       return true;
@@ -958,9 +985,9 @@
 
     var ctaEls = getCTAs();
     var ctaLinks = ctaEls
-      .filter(function(el) { return el.tagName === 'A' && el.getAttribute('href'); })
-      .map(function(el) { return { el: el, href: el.getAttribute('href'), isCTA: true }; })
-      .filter(function(item) {
+      .filter(function (el) { return el.tagName === 'A' && el.getAttribute('href'); })
+      .map(function (el) { return { el: el, href: el.getAttribute('href'), isCTA: true }; })
+      .filter(function (item) {
         var href = item.href;
         return href && href !== '#' && !/^(mailto|tel|javascript):/i.test(href);
       });
@@ -971,35 +998,77 @@
     var broken = [];
     var ctaFailed = [];
     var done = 0;
+    // Cross-origin links we could only confirm as "reachable" via an opaque
+    // response. Reported so the score is never silently overstated.
+    var unverified = 0;
+
+    // Link health is checked in up to three passes, because a cross-origin
+    // fetch that throws tells us nothing about the link — it usually means the
+    // target simply sends no CORS headers, which is true of most of the web.
+    // Treating that as "broken" is what produced false positives on every
+    // external link. Only a definite signal is allowed to fail a link.
+    //   1. HEAD (same-origin, or CORS-enabled cross-origin) → real status code
+    //   2. GET  (some servers reject HEAD with 405/501)     → real status code
+    //   3. no-cors GET → opaque response: proves the host resolved and
+    //      answered, so the link is reachable even though we cannot read the
+    //      status. Anything still failing here is genuinely unreachable.
+    var sameOrigin = function (u) {
+      try { return new URL(u, location.href).origin === location.origin; } catch (e) { return false; }
+    };
+
+    function timedFetch(href, opts) {
+      var controller = new AbortController();
+      var timeout = setTimeout(function () { controller.abort(); }, CONFIG.linkTimeout);
+      opts.signal = controller.signal;
+      opts.redirect = 'follow';
+      return fetch(href, opts).then(
+        function (res) { clearTimeout(timeout); return res; },
+        function (err) { clearTimeout(timeout); throw err; }
+      );
+    }
 
     async function checkUrl(href) {
+      var isLocal = sameOrigin(href);
+      // credentials only for same-origin: sending cookies cross-origin is both
+      // a privacy leak and a guaranteed CORS rejection.
+      var creds = isLocal ? 'include' : 'omit';
+      var lastErr = null;
+
+      for (var i = 0; i < 2; i++) {
+        try {
+          var res = await timedFetch(href, { method: i === 0 ? 'HEAD' : 'GET', credentials: creds });
+          // 405/501 => method not allowed, retry as GET before believing it.
+          if (i === 0 && (res.status === 405 || res.status === 501)) continue;
+          return { href: href, status: res.status, ok: res.ok };
+        } catch (e) {
+          lastErr = e;
+          if (e.name === 'AbortError') return { href: href, status: 'timeout', ok: false };
+        }
+      }
+
+      // Both readable attempts failed. Distinguish "blocked by CORS" (fine)
+      // from "host does not answer" (genuinely broken).
       try {
-        var controller = new AbortController();
-        var timeout = setTimeout(function() { controller.abort(); }, CONFIG.linkTimeout);
-        var res = await fetch(href, {
-          method: 'HEAD',
-          credentials: 'include',
-          signal: controller.signal,
-          redirect: 'follow'
-        });
-        clearTimeout(timeout);
-        return { href: href, status: res.status, ok: res.ok };
+        await timedFetch(href, { method: 'GET', mode: 'no-cors', credentials: 'omit' });
+        return { href: href, status: 'opaque', ok: true, unverified: true };
       } catch (e) {
-        return { href: href, status: e.name === 'AbortError' ? 'timeout' : 'error', ok: false };
+        if (e.name === 'AbortError') return { href: href, status: 'timeout', ok: false };
+        return { href: href, status: 'unreachable', ok: false };
       }
     }
 
     async function processBatch(items, isCTA) {
       for (var i = 0; i < items.length; i += CONFIG.linkBatchSize) {
         var batch = items.slice(i, i + CONFIG.linkBatchSize);
-        var batchResults = await Promise.all(batch.map(function(item) {
+        var batchResults = await Promise.all(batch.map(function (item) {
           var url = item.href;
           if (url.charAt(0) === '/') url = location.origin + url;
           return checkUrl(url);
         }));
-        batchResults.forEach(function(result, idx) {
+        batchResults.forEach(function (result, idx) {
           done++;
           updateLinkProgress(done, total);
+          if (result.unverified) unverified++;
           if (!result.ok) {
             var entry = {
               href: result.href,
@@ -1027,9 +1096,10 @@
       id: 'C-08', pillar: 'content', priority: 'P1',
       label: 'Internal links resolve (not 404)',
       status: broken.length === 0 ? 'pass' : 'fail',
-      detail: broken.length === 0
+      detail: (broken.length === 0
         ? 'All ' + uniqueLinks.length + ' internal links resolve correctly'
-        : broken.length + ' broken link(s) found',
+        : broken.length + ' broken link(s) found')
+        + (unverified > 0 ? ' (' + unverified + ' cross-origin link(s) reachable but status unreadable)' : ''),
       items: broken
     });
 
@@ -1041,28 +1111,35 @@
       detail: ctaFailed.length === 0
         ? 'All ' + ctaLinks.length + ' CTA links resolve'
         : ctaFailed.length + ' CTA(s) pointing to dead URLs',
+      unverifiedCount: unverified,
       items: ctaFailed
     });
 
     finalizeScores();
-    updateToast('📡 Sending report to dashboard…', 90);
-    sendToServer();
+
+    if (CONFIG.ui === 'toast') {
+      updateToast('📡 Sending report to dashboard…', 90);
+      sendToServer();
+    } else {
+      renderFinalResults();
+      if (CONFIG.autoSend) sendToServer();
+    }
   }
 
   // ─── SCORING ENGINE ───────────────────────────────────────────────────
 
   var PRIORITY_WEIGHTS = { P1: 4, P2: 2, P3: 1, P4: 0 };
-  var RESULT_SCORES    = { pass: 1.0, warn: 0.5, fail: 0.0, info: null };
+  var RESULT_SCORES = { pass: 1.0, warn: 0.5, fail: 0.0, info: null };
 
   function calcPillarScore(checks) {
     var earned = 0;
     var possible = 0;
-    checks.forEach(function(c) {
+    checks.forEach(function (c) {
       var weight = PRIORITY_WEIGHTS[c.priority] || 0;
       if (weight === 0) return;
       var factor = RESULT_SCORES[c.status];
       if (factor === null || factor === undefined) return;
-      earned   += weight * factor;
+      earned += weight * factor;
       possible += weight;
     });
     return possible === 0 ? 100 : Math.round((earned / possible) * 100);
@@ -1071,15 +1148,15 @@
   function calcOverallScore(pillarScores) {
     var w = CONFIG.weights;
     return Math.round(
-      pillarScores.metadata      * w.metadata +
-      pillarScores.content       * w.content +
-      pillarScores.responsive    * w.responsive +
+      pillarScores.metadata * w.metadata +
+      pillarScores.content * w.content +
+      pillarScores.responsive * w.responsive +
       pillarScores.accessibility * w.accessibility
     );
   }
 
   function getGoNoGo(overall, allChecks) {
-    var p1Failures = allChecks.filter(function(c) {
+    var p1Failures = allChecks.filter(function (c) {
       return c.priority === 'P1' && c.status === 'fail';
     });
     if (p1Failures.length > 0)
@@ -1095,51 +1172,400 @@
 
   function finalizeScores() {
     var allChecks = [].concat(results.metadata, results.content, results.responsive, results.accessibility);
-    overallScores.metadata      = calcPillarScore(results.metadata);
-    overallScores.content       = calcPillarScore(results.content);
-    overallScores.responsive    = calcPillarScore(results.responsive);
+    overallScores.metadata = calcPillarScore(results.metadata);
+    overallScores.content = calcPillarScore(results.content);
+    overallScores.responsive = calcPillarScore(results.responsive);
     overallScores.accessibility = calcPillarScore(results.accessibility);
-    overallScores.overall       = calcOverallScore(overallScores);
-    overallScores.goNoGo        = getGoNoGo(overallScores.overall, allChecks);
+    overallScores.overall = calcOverallScore(overallScores);
+    overallScores.goNoGo = getGoNoGo(overallScores.overall, allChecks);
   }
 
-  // ─── AUTO-SEND TO DASHBOARD (TCM Extractor pattern) ────────────────
+  // ─── QA PANEL UI ──────────────────────────────────────────────────────
+
+  function injectPanelStyles() {
+    var style = document.createElement('style');
+    style.id = 'aem-qa-styles';
+    style.textContent = [
+      '#aem-qa-panel * { box-sizing:border-box; font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif; }',
+      '#aem-qa-panel { position:fixed; top:0; right:0; width:390px; height:100vh;',
+      '  background:#0A0F1E; color:#F9FAFB; z-index:2147483647;',
+      '  display:flex; flex-direction:column; box-shadow:-4px 0 32px rgba(0,0,0,.65); font-size:13px; overflow:hidden; }',
+      '#aem-qa-panel .qa-hdr { background:#1450F5; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }',
+      '#aem-qa-panel .qa-hdr h1 { font-size:15px; font-weight:700; margin:0; color:#fff; display:flex; align-items:center; gap:8px; }',
+      '#aem-qa-panel .qa-hdr button { background:rgba(255,255,255,.2); border:none; color:#fff; cursor:pointer; padding:4px 8px; border-radius:4px; font-size:12px; font-weight:600; }',
+      '#aem-qa-panel .qa-hdr button:hover { background:rgba(255,255,255,.3); }',
+      '#aem-qa-panel .qa-meta { padding:10px 16px; background:#111827; border-bottom:1px solid #1F2937; font-size:11px; color:#9CA3AF; flex-shrink:0; display:flex; justify-content:space-between; }',
+      '#aem-qa-panel .qa-scr { padding:12px 16px; background:#111827; border-bottom:1px solid #1F2937; flex-shrink:0; }',
+      '#aem-qa-panel .qa-scr-hdr { display:flex; align-items:baseline; justify-content:space-between; }',
+      '#aem-qa-panel .qa-scr-v { font-size:32px; font-weight:800; line-height:1; }',
+      '#aem-qa-panel .qa-scr-v.p { color:#10B981; }',
+      '#aem-qa-panel .qa-scr-v.w { color:#F59E0B; }',
+      '#aem-qa-panel .qa-scr-v.f { color:#EF4444; }',
+      '#aem-qa-panel .qa-status-tag { padding:4px 8px; border-radius:4px; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; }',
+      '#aem-qa-panel .qa-status-tag.BLOCK { background:#7F1D1D; color:#FCA5A5; border:1px solid #DC2626; }',
+      '#aem-qa-panel .qa-status-tag.PASS { background:#064E3B; color:#A7F3D0; border:1px solid #10B981; }',
+      '#aem-qa-panel .qa-status-tag.PASS_WITH_WARNINGS { background:#78350F; color:#FDE68A; border:1px solid #F59E0B; }',
+      '#aem-qa-panel .qa-status-tag.CONDITIONAL { background:#78350F; color:#FDE68A; border:1px solid #F59E0B; }',
+      '#aem-qa-panel .qa-status-tag.FAIL { background:#7F1D1D; color:#FCA5A5; border:1px solid #DC2626; }',
+      '#aem-qa-panel .qa-bar { height:6px; background:#1F2937; border-radius:3px; margin:8px 0 4px 0; overflow:hidden; }',
+      '#aem-qa-panel .qa-fill { height:100%; border-radius:3px; transition:width .4s; }',
+      '#aem-qa-panel .qa-p1a { background:rgba(220,38,38,.15); border:1px solid #DC2626; border-radius:6px; padding:6px 10px; margin-top:6px; color:#FCA5A5; font-size:12px; font-weight:600; display:flex; align-items:center; gap:6px; }',
+      '#aem-qa-panel .qa-p-scores { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:4px; margin-top:10px; text-align:center; font-size:10px; }',
+      '#aem-qa-panel .qa-p-card { background:#1F2937; padding:4px 2px; border-radius:4px; }',
+      '#aem-qa-panel .qa-p-val { font-weight:700; font-size:12px; color:#F3F4F6; }',
+      '#aem-qa-panel .qa-p-lbl { color:#9CA3AF; font-size:9px; text-transform:uppercase; margin-top:2px; }',
+      '#aem-qa-panel .qa-bod { flex:1; overflow-y:auto; padding:8px 0; }',
+      '#aem-qa-panel .qa-pil { border-bottom:1px solid #1F2937; }',
+      '#aem-qa-panel .qa-ph { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; cursor:pointer; user-select:none; background:#111827; }',
+      '#aem-qa-panel .qa-ph:hover { background:#1A2235; }',
+      '#aem-qa-panel .qa-pt { font-weight:600; font-size:13px; display:flex; align-items:center; gap:6px; }',
+      '#aem-qa-panel .qa-ps { font-size:12px; color:#9CA3AF; font-weight:600; }',
+      '#aem-qa-panel .qa-pb { display:none; padding:4px 0; }',
+      '#aem-qa-panel .qa-pb.open { display:block; }',
+      '#aem-qa-panel .qa-chk { padding:8px 16px; border-left:3px solid transparent; display:flex; align-items:flex-start; gap:8px; }',
+      '#aem-qa-panel .qa-chk.pass { border-color:#10B981; }',
+      '#aem-qa-panel .qa-chk.warn { border-color:#F59E0B; background:rgba(245,158,11,.05); }',
+      '#aem-qa-panel .qa-chk.fail { border-color:#EF4444; background:rgba(239,68,68,.07); }',
+      '#aem-qa-panel .qa-chk.info { border-color:#374151; }',
+      '#aem-qa-panel .qa-ci { flex-shrink:0; font-size:14px; }',
+      '#aem-qa-panel .qa-cb { flex:1; min-width:0; }',
+      '#aem-qa-panel .qa-cl { font-weight:500; font-size:12px; }',
+      '#aem-qa-panel .qa-cd { color:#9CA3AF; font-size:11px; margin-top:2px; word-break:break-word; }',
+      '#aem-qa-panel .qa-bg { font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px; letter-spacing:.5px; margin-right:4px; }',
+      '#aem-qa-panel .qa-bg.P1 { background:#7F1D1D; color:#FCA5A5; }',
+      '#aem-qa-panel .qa-bg.P2 { background:#7C2D12; color:#FED7AA; }',
+      '#aem-qa-panel .qa-bg.P3 { background:#713F12; color:#FEF08A; }',
+      '#aem-qa-panel .qa-bg.P4 { background:#374151; color:#9CA3AF; }',
+      '#aem-qa-panel .qa-items { margin-top:6px; }',
+      '#aem-qa-panel .qa-item { font-size:10px; color:#6B7280; padding:2px 0 2px 12px; border-left:1px solid #374151; margin-left:4px; word-break:break-all; }',
+      '#aem-qa-panel .qa-ftr { padding:10px 16px; background:#111827; border-top:1px solid #1F2937; display:flex; gap:6px; flex-wrap:wrap; flex-shrink:0; }',
+      '#aem-qa-panel .qa-ftr button { flex:1; padding:8px; border-radius:6px; border:1px solid #1F2937; background:#1A2235; color:#9CA3AF; cursor:pointer; font-size:11px; min-width:80px; font-weight:600; }',
+      '#aem-qa-panel .qa-ftr button:hover { background:#243148; color:#F9FAFB; }',
+      '#aem-qa-panel .qa-ftr button.primary { background:#1450F5; color:#fff; border-color:#1450F5; }',
+      '#aem-qa-panel .qa-ftr button.primary:hover { background:#1040C5; }',
+      '#aem-qa-panel .qa-bp { display:flex; gap:4px; margin-top:6px; }',
+      '#aem-qa-panel .qa-bp button { font-size:10px; padding:4px 8px; border-radius:4px; border:1px solid #374151; background:#1A2235; color:#9CA3AF; cursor:pointer; font-weight:600; }',
+      '#aem-qa-panel .qa-bp button:hover { background:#243148; color:#fff; }',
+      '#aem-qa-panel .qa-prg { padding:10px 16px; background:#111827; border-bottom:1px solid #1F2937; font-size:11px; color:#9CA3AF; flex-shrink:0; }',
+      '#aem-qa-panel .qa-pgb { height:4px; background:#1F2937; border-radius:2px; margin-top:6px; overflow:hidden; }',
+      '#aem-qa-panel .qa-pgf { height:100%; background:#1450F5; border-radius:2px; transition:width .2s; }'
+    ].join('\n');
+    document.head.appendChild(style);
+  }
+
+  function injectPanel() {
+    var panel = document.createElement('div');
+    panel.id = CONFIG.panelId;
+    panel.innerHTML = [
+      '<div class="qa-hdr">',
+      '  <h1><span>⚡</span> AEM QA Auditor <span style="font-size:10px;opacity:0.7;">v' + CONFIG.version + '</span></h1>',
+      '  <button id="qa-close-btn">✕ Close</button>',
+      '</div>',
+      '<div class="qa-meta">',
+      '  <span>' + location.hostname + '</span>',
+      '  <span>' + new Date().toLocaleTimeString() + '</span>',
+      '</div>',
+      '<div class="qa-scr" id="qa-score-card">',
+      '  <!-- Rendered dynamically -->',
+      '</div>',
+      '<div class="qa-prg" id="qa-progress">',
+      '  <div id="qa-progress-text">Checking links… 0/0 (0%)</div>',
+      '  <div class="qa-pgb"><div class="qa-pgf" id="qa-pbar-fill" style="width:0%"></div></div>',
+      '</div>',
+      '<div class="qa-bod" id="qa-body">',
+      '  <div class="qa-pil" data-pillar="metadata">',
+      '    <div class="qa-ph"><span class="qa-pt">📄 Metadata</span><span class="qa-ps" id="qa-ps-metadata">--</span></div>',
+      '    <div class="qa-pb open" id="qa-pb-metadata"></div>',
+      '  </div>',
+      '  <div class="qa-pil" data-pillar="content">',
+      '    <div class="qa-ph"><span class="qa-pt">🧩 Content & Components</span><span class="qa-ps" id="qa-ps-content">--</span></div>',
+      '    <div class="qa-pb open" id="qa-pb-content"></div>',
+      '  </div>',
+      '  <div class="qa-pil" data-pillar="responsive">',
+      '    <div class="qa-ph"><span class="qa-pt">📱 Responsive Layout</span><span class="qa-ps" id="qa-ps-responsive">--</span></div>',
+      '    <div class="qa-pb" id="qa-pb-responsive"></div>',
+      '  </div>',
+      '  <div class="qa-pil" data-pillar="accessibility">',
+      '    <div class="qa-ph"><span class="qa-pt">♿ Accessibility</span><span class="qa-ps" id="qa-ps-accessibility">--</span></div>',
+      '    <div class="qa-pb" id="qa-pb-accessibility"></div>',
+      '  </div>',
+      '</div>',
+      '<div class="qa-ftr">',
+      '  <button id="qa-btn-export" class="primary">📤 Export JSON</button>',
+      '  <button id="qa-btn-copy">📋 Copy Report</button>',
+      '  <button id="qa-btn-server">📡 Send to Server</button>',
+      '</div>'
+    ].join('\n');
+
+    document.body.appendChild(panel);
+
+    document.getElementById('qa-close-btn').addEventListener('click', function () {
+      panel.remove();
+      var existingStyles = document.getElementById('aem-qa-styles');
+      if (existingStyles) existingStyles.remove();
+    });
+
+    document.querySelectorAll('#aem-qa-panel .qa-ph').forEach(function (hdr) {
+      hdr.addEventListener('click', function () {
+        var body = this.nextElementSibling;
+        body.classList.toggle('open');
+      });
+    });
+
+    document.getElementById('qa-btn-export').addEventListener('click', exportJSON);
+    document.getElementById('qa-btn-copy').addEventListener('click', copyReport);
+    document.getElementById('qa-btn-server').addEventListener('click', sendToServer);
+  }
+
+  function renderScoreCard() {
+    var sc = document.getElementById('qa-score-card');
+    if (!sc) return;
+
+    var overall = overallScores.overall;
+    var statusClass = overall >= 80 ? (overall >= 90 ? 'p' : 'w') : 'f';
+    var fillBg = overall >= 80 ? (overall >= 90 ? '#10B981' : '#F59E0B') : '#EF4444';
+    var g = overallScores.goNoGo;
+
+    var allChecks = [].concat(results.metadata, results.content, results.responsive, results.accessibility);
+    var p1Fails = allChecks.filter(function (c) { return c.priority === 'P1' && c.status === 'fail'; }).length;
+
+    sc.innerHTML = [
+      '<div class="qa-scr-hdr">',
+      '  <div>',
+      '    <div style="font-size:11px;color:#9CA3AF;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Overall Health</div>',
+      '    <div class="qa-scr-v ' + statusClass + '">' + overall + '<span style="font-size:16px;">/100</span></div>',
+      '  </div>',
+      '  <div class="qa-status-tag ' + g.status + '">' + g.status.replace(/_/g, ' ') + '</div>',
+      '</div>',
+      '<div class="qa-bar"><div class="qa-fill" style="width:' + overall + '%;background:' + fillBg + ';"></div></div>',
+      p1Fails > 0 ? '<div class="qa-p1a">🚨 BLOCKS GO-LIVE — ' + p1Fails + ' P1 Critical Failure(s)</div>' : '',
+      '<div class="qa-p-scores">',
+      '  <div class="qa-p-card"><div class="qa-p-val">' + overallScores.metadata + '%</div><div class="qa-p-lbl">Meta</div></div>',
+      '  <div class="qa-p-card"><div class="qa-p-val">' + overallScores.content + '%</div><div class="qa-p-lbl">Content</div></div>',
+      '  <div class="qa-p-card"><div class="qa-p-val">' + overallScores.responsive + '%</div><div class="qa-p-lbl">Resp</div></div>',
+      '  <div class="qa-p-card"><div class="qa-p-val">' + overallScores.accessibility + '%</div><div class="qa-p-lbl">A11y</div></div>',
+      '</div>'
+    ].join('\n');
+  }
+
+  function renderChecks(pillar, checks) {
+    var container = document.getElementById('qa-pb-' + pillar);
+    var scoreElem = document.getElementById('qa-ps-' + pillar);
+    if (!container) return;
+
+    if (scoreElem) {
+      scoreElem.textContent = overallScores[pillar] + '%';
+    }
+
+    var html = checks.map(function (c) {
+      var icon = c.status === 'pass' ? '✅'
+        : c.status === 'warn' ? '⚠️'
+          : c.status === 'fail' ? '❌' : 'ℹ️';
+
+      var itemsHtml = '';
+      if (c.items && c.items.length > 0) {
+        itemsHtml = '<div class="qa-items">' + c.items.map(function (it) {
+          var text = typeof it === 'string' ? it : (it.text || it.detail || JSON.stringify(it));
+          var sub = typeof it === 'object' && it.element ? ' <span style="opacity:0.7">[' + it.element + ']</span>' : '';
+          return '<div class="qa-item">' + text + sub + '</div>';
+        }).join('') + '</div>';
+      }
+
+      var popupHtml = '';
+      if (c.isBreakpointControl) {
+        popupHtml = [
+          '<div class="qa-bp">',
+          '  <button onclick="window.open(location.href, \'_blank\', \'width=375,height=812\')">375px Mobile ↗</button>',
+          '  <button onclick="window.open(location.href, \'_blank\', \'width=768,height=1024\')">768px Tablet ↗</button>',
+          '  <button onclick="window.open(location.href, \'_blank\', \'width=1440,height=900\')">1440px Desktop ↗</button>',
+          '</div>'
+        ].join('');
+      }
+
+      return [
+        '<div class="qa-chk ' + c.status + '">',
+        '  <div class="qa-ci">' + icon + '</div>',
+        '  <div class="qa-cb">',
+        '    <div class="qa-cl"><span class="qa-bg ' + c.priority + '">' + c.priority + '</span>' + c.label + '</div>',
+        '    <div class="qa-cd">' + c.detail + '</div>',
+        '    ' + itemsHtml,
+        '    ' + popupHtml,
+        '  </div>',
+        '</div>'
+      ].join('');
+    }).join('');
+
+    container.innerHTML = html;
+  }
+
+  function renderPartialResults() {
+    // Panel-only. In toast mode there is no panel DOM to render into.
+    if (CONFIG.ui !== 'panel') return;
+    renderScoreCard();
+    renderChecks('metadata', results.metadata);
+    renderChecks('content', results.content);
+    renderChecks('responsive', results.responsive);
+    renderChecks('accessibility', results.accessibility);
+  }
+
+  function renderFinalResults() {
+    renderPartialResults();
+  }
+
+  // ─── EXPORT & PAYLOAD FUNCTIONS ──────────────────────────────────────
+
+  function buildReportPayload() {
+    var allChecks = [].concat(results.metadata, results.content, results.responsive, results.accessibility);
+    var defects = allChecks.filter(function (c) { return c.status === 'fail' || c.status === 'warn'; });
+
+    return {
+      meta: {
+        url: location.href,
+        pageTitle: document.title,
+        auditedAt: new Date().toISOString(),
+        toolVersion: CONFIG.version,
+        viewport: window.innerWidth,
+        overallScore: overallScores.overall,
+        threshold: CONFIG.thresholdScore,
+        status: overallScores.goNoGo.status,
+        goNoGo: overallScores.goNoGo.status,
+        p1FailCount: allChecks.filter(function (c) { return c.priority === 'P1' && c.status === 'fail'; }).length
+      },
+      scores: {
+        metadata: { score: overallScores.metadata, weight: CONFIG.weights.metadata },
+        content: { score: overallScores.content, weight: CONFIG.weights.content },
+        responsive: { score: overallScores.responsive, weight: CONFIG.weights.responsive },
+        accessibility: { score: overallScores.accessibility, weight: CONFIG.weights.accessibility }
+      },
+      checks: allChecks,
+      defects: defects,
+      info: {
+        totalChecks: allChecks.length,
+        passed: allChecks.filter(function (c) { return c.status === 'pass'; }).length,
+        warned: allChecks.filter(function (c) { return c.status === 'warn'; }).length,
+        failed: allChecks.filter(function (c) { return c.status === 'fail'; }).length
+      }
+    };
+  }
+
+  // ─── TOAST UI (CONFIG.ui === 'toast') ───────────────────────────────
+  // Lightweight fire-and-forget presentation: no panel, auto-sends on finish.
+
+  function injectToast() {
+    var style = document.createElement('style');
+    style.id = 'aem-qa-toast-style';
+    style.textContent = [
+      '@keyframes qa-slide{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}',
+      '@keyframes qa-fade{from{opacity:1}to{opacity:0}}',
+      '#aem-qa-toast{position:fixed;bottom:24px;right:24px;width:288px;',
+      'background:#0A0F1E;color:#F9FAFB;border:1px solid #1450F5;border-radius:12px;',
+      'padding:14px 18px;font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;',
+      'font-size:13px;z-index:2147483647;box-shadow:0 8px 32px rgba(0,0,0,0.65);',
+      'animation:qa-slide 0.3s ease;line-height:1.6;}',
+      '#aem-qa-toast.qa-done{animation:qa-fade 0.5s ease 3.5s forwards;}',
+      '#aem-qa-toast .qa-t-title{font-weight:700;font-size:14px;color:#fff;margin-bottom:4px;}',
+      '#aem-qa-toast .qa-t-msg{color:#9CA3AF;font-size:12px;min-height:16px;}',
+      '#aem-qa-toast .qa-t-bar{height:3px;background:#1F2937;border-radius:2px;margin-top:10px;overflow:hidden;}',
+      '#aem-qa-toast .qa-t-fill{height:100%;background:#1450F5;border-radius:2px;transition:width 0.4s ease;}'
+    ].join('');
+    document.head.appendChild(style);
+
+    var toast = document.createElement('div');
+    toast.id = TOAST_ID;
+    toast.innerHTML = [
+      '<div class="qa-t-title">⚡ AEM QA Auditor</div>',
+      '<div class="qa-t-msg" id="qa-t-msg">🔄 Running checks…</div>',
+      '<div class="qa-t-bar"><div class="qa-t-fill" id="qa-t-fill" style="width:5%"></div></div>'
+    ].join('');
+    document.body.appendChild(toast);
+  }
+
+  // Safe to call in any UI mode — a no-op when no toast is on the page.
+  // (The panel build used to call this without defining it, which threw.)
+  function updateToast(message, percent, isError, isDone) {
+    var msg = document.getElementById('qa-t-msg');
+    if (!msg) return;
+    msg.textContent = message;
+    if (isError) msg.style.color = '#EF4444';
+
+    var fill = document.getElementById('qa-t-fill');
+    if (fill && typeof percent === 'number') fill.style.width = percent + '%';
+
+    if (isDone) {
+      var toast = document.getElementById(TOAST_ID);
+      if (toast) {
+        toast.classList.add('qa-done');
+        setTimeout(function () {
+          var t = document.getElementById(TOAST_ID);
+          if (t) t.remove();
+          var s = document.getElementById('aem-qa-toast-style');
+          if (s) s.remove();
+        }, 4200);
+      }
+    }
+  }
+
+  function exportJSON() {
+    var data = buildReportPayload();
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'aem-qa-' + location.hostname + '-' + Date.now() + '.json';
+    a.click();
+  }
+
+  function copyReport() {
+    var data = buildReportPayload();
+    var lines = [
+      '# AEM QA Report — ' + data.meta.url,
+      'Score: ' + data.meta.overallScore + '/100 | Status: ' + data.meta.status,
+      'Audited: ' + data.meta.auditedAt,
+      '',
+      '## Defects'
+    ];
+    data.defects.forEach(function (d) {
+      lines.push('- [' + d.priority + '] ' + d.id + ' — ' + d.label + ': ' + d.detail);
+    });
+    navigator.clipboard.writeText(lines.join('\n'));
+    alert('Report copied to clipboard in Markdown format!');
+  }
 
   async function sendToServer() {
     var data = buildReportPayload();
     var payload = { type: 'AEM_QA_REPORT', report: data };
 
-    // ── 1. PRIMARY: Direct postMessage to dashboard window opener ──────
-    // Works because dashboard uses window.open() to launch target pages,
-    // establishing window.opener — identical to TCM Extractor's mechanism.
-    if (window.opener && !window.opener.closed) {
-      try { window.opener.postMessage(payload, '*'); } catch (ex) {}
+    // ── 1. PRIMARY: postMessage to dashboard opener ──────────────────────────
+    // Targeted at the dashboard origin specifically. Audit payloads embed
+    // internal author/stage URLs and page content, so broadcasting them to '*'
+    // would hand them to any window that happens to be listening.
+    if (window.opener && !window.opener.closed && CONFIG.reportOrigin) {
+      try { window.opener.postMessage(payload, CONFIG.reportOrigin); } catch (ex) {}
     }
 
-    // ── 2. SECONDARY: BroadcastChannel for same-origin tabs ────────────
-    // Catches cases where dashboard and target share the same origin.
+    // ── 2. SECONDARY: BroadcastChannel for same-origin tabs ──────────────────
     try {
       var bc = new BroadcastChannel('aem_qa_channel');
       bc.postMessage(payload);
       bc.close();
     } catch (ex) {}
 
-    // ── 3. TERTIARY: Silent HTTP POST fallback ──────────────────────────
-    // Best-effort only — never blocks or shows error if it fails.
+    // ── 3. TERTIARY: Silent HTTP POST fallback (never blocks or alerts) ───────
     try {
+      var headers = { 'Content-Type': 'application/json' };
+      if (CONFIG.apiToken) headers['X-QA-Token'] = CONFIG.apiToken;
       fetch(CONFIG.reportServer, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: JSON.stringify(data)
       }).catch(function () {});
     } catch (ex) {}
 
-    // ── 4. Show center-screen completion dialog (TCM Extractor style) ───
+    // ── 4. Center-screen completion dialog (exactly like TCM Extractor) ───────
     var score = data.meta.overallScore;
     var goNoGo = data.meta.goNoGo || 'UNKNOWN';
-    var isGo = goNoGo === 'GO';
-    var gc = isGo ? '#00e5b0' : (score >= 50 ? '#ffb84f' : '#ff4f6a');
-    var icon = isGo ? '✅' : (score >= 50 ? '⚠️' : '❌');
+    var isPass = goNoGo === 'PASS' || goNoGo === 'PASS_WITH_WARNINGS';
+    var gc = isPass ? '#00e5b0' : (score >= 50 ? '#ffb84f' : '#ff4f6a');
+    var icon = isPass ? '✅' : (score >= 50 ? '⚠️' : '❌');
     var shortU = location.href.length > 68 ? location.href.slice(0, 68) + '…' : location.href;
 
     var inner = '<div style="background:#1a1f2e;border-radius:14px;padding:28px 32px;max-width:420px;width:88%;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.75);border:2px solid ' + gc + ';box-sizing:border-box;font-family:system-ui,sans-serif">'
@@ -1151,7 +1577,7 @@
       + '<div id="__qaaudcl__" style="font-size:11px;color:#6b7599;background:#0d0f18;border-radius:6px;padding:6px 14px;display:inline-block">Sending to QA Dashboard — closing in 3s</div>'
       + '</div>';
 
-    // Try <dialog>.showModal() first: browser top-layer, above ALL z-index/overflow:hidden (TCM pattern)
+    // Try <dialog>.showModal() — browser top-layer, beats ALL z-index/overflow:hidden
     var shown = false;
     try {
       var old = document.getElementById('__qaaud__'); if (old) old.remove();
@@ -1164,18 +1590,12 @@
       shown = true;
     } catch (ex) {}
 
-    // Fallback: position:fixed div (avoids cssText CSP issues — TCM pattern)
+    // Fallback: position:fixed div
     if (!shown) {
       var old2 = document.getElementById('__qaaud__'); if (old2) old2.remove();
       var ov = document.createElement('div');
       ov.id = '__qaaud__';
-      ov.style.position = 'fixed';
-      ov.style.top = '0'; ov.style.left = '0'; ov.style.right = '0'; ov.style.bottom = '0';
-      ov.style.background = 'rgba(0,0,0,.8)';
-      ov.style.zIndex = '2147483647';
-      ov.style.display = 'flex';
-      ov.style.alignItems = 'center';
-      ov.style.justifyContent = 'center';
+      ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);z-index:2147483647;display:flex;align-items:center;justify-content:center';
       ov.innerHTML = inner;
       (document.body || document.documentElement).appendChild(ov);
     }
@@ -1191,38 +1611,17 @@
     }, 3000);
   }
 
-  function buildReportPayload() {
-    var allChecks = [].concat(results.metadata, results.content, results.responsive, results.accessibility);
-    var defects = allChecks.filter(function(c) { return c.status === 'fail' || c.status === 'warn'; });
+  // ─── BOOT ─────────────────────────────────────────────────────────────
+  // Must stay last: everything above is now initialised, including the `var`
+  // lookup tables the scoring engine depends on.
 
-    return {
-      meta: {
-        url: location.href,
-        pageTitle: document.title,
-        auditedAt: new Date().toISOString(),
-        toolVersion: CONFIG.version,
-        viewport: window.innerWidth,
-        overallScore: overallScores.overall,
-        threshold: CONFIG.thresholdScore,
-        status: overallScores.goNoGo.status,
-        goNoGo: overallScores.goNoGo.status,
-        p1FailCount: allChecks.filter(function(c) { return c.priority === 'P1' && c.status === 'fail'; }).length
-      },
-      scores: {
-        metadata:      { score: overallScores.metadata,      weight: CONFIG.weights.metadata },
-        content:       { score: overallScores.content,       weight: CONFIG.weights.content },
-        responsive:    { score: overallScores.responsive,    weight: CONFIG.weights.responsive },
-        accessibility: { score: overallScores.accessibility, weight: CONFIG.weights.accessibility }
-      },
-      checks: allChecks,
-      defects: defects,
-      info: {
-        totalChecks: allChecks.length,
-        passed:  allChecks.filter(function(c) { return c.status === 'pass'; }).length,
-        warned:  allChecks.filter(function(c) { return c.status === 'warn'; }).length,
-        failed:  allChecks.filter(function(c) { return c.status === 'fail'; }).length
-      }
-    };
+  if (CONFIG.ui === 'toast') {
+    injectToast();
+  } else {
+    injectPanelStyles();
+    injectPanel();
   }
+  runPhase1();
+  runPhase2();
 
 })();

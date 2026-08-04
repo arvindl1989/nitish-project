@@ -15,7 +15,7 @@ Manual AEM page QA is **slow, inconsistent, and prone to escaped defects**. A si
 ### The Solution
 We built a **zero-dependency, one-click browser bookmarklet** that runs directly inside an active browser session on any AEM Cloud Author Preview or Publish page.
 
-- ⚡ **Instant Execution:** 52 automated checks executed in ~1s (DOM) + ~10s (async link verification).
+- ⚡ **Instant Execution:** 49 automated checks executed in ~1s (DOM) + ~10s (async link verification).
 - 🔐 **Authentication Solved:** Zero credentials or cookies to manage; it inherits the active browser’s IMS session.
 - 🎯 **Elevated P1 Checks:** Deep focus on broken internal links, raw AEM content paths, and non-functional CTAs.
 - 📊 **Immediate Visual Reporting:** Injects a clean, interactive side-panel right on the target page, with JSON export and local server logging.
@@ -136,7 +136,7 @@ If developers or architects ask technical questions during the demo, use these t
 ## 6. Sprint Outcomes & Next Steps
 
 ### What We Completed This Sprint (Phase 1)
-- [x] Defined 52-point 4-Pillar QA specification mapped to AEM Core Components & WCAG 2.1 AA.
+- [x] Defined 49-point 4-Pillar QA specification mapped to AEM Core Components & WCAG 2.1 AA.
 - [x] Created zero-dependency bookmarklet engine (`bookmarklet.js` & `build-bookmarklet.js`).
 - [x] Built async link & CTA verification engine with batching and timeout protection.
 - [x] Implemented instant visual overlay panel with Go/No-Go status calculation.

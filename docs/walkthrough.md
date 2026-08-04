@@ -1,18 +1,18 @@
 # AEM QA Framework Prototype Walkthrough
 
-We have built the complete zero-dependency **AEM QA Framework** prototype inside `g:\git repo\QA\aem-qa-tool\`.
+We have built the complete zero-dependency **AEM QA Framework** prototype inside `src/` and `scripts/`.
 
 ## 📁 Artifacts Created
 
 | File | Description |
 |---|---|
-| [`bookmarklet.js`](file:///g:/git%20repo/QA/aem-qa-tool/bookmarklet.js) | Full 52-check QA engine across 4 pillars (Metadata, Content & Components, Responsive, Accessibility) with in-page UI panel |
-| [`build-bookmarklet.js`](file:///g:/git%20repo/QA/aem-qa-tool/build-bookmarklet.js) | Build script to minify & encode bookmarklet into `javascript:` URL |
-| [`AEM_QA_BOOKMARK.txt`](file:///g:/git%20repo/QA/aem-qa-tool/AEM_QA_BOOKMARK.txt) | Minified bookmarklet URL ready to add to browser bookmarks |
-| [`server.js`](file:///g:/git%20repo/QA/aem-qa-tool/server.js) | Zero-dependency HTTP report server & REST API (runs on `http://localhost:3500`) |
-| [`public/index.html`](file:///g:/git%20repo/QA/aem-qa-tool/public/index.html) | Modern dark-mode Dashboard UI for history & detailed audit inspection |
-| [`public/style.css`](file:///g:/git%20repo/QA/aem-qa-tool/public/style.css) | Custom styling for the dashboard |
-| [`public/app.js`](file:///g:/git%20repo/QA/aem-qa-tool/public/app.js) | Dashboard client application logic |
+| [`bookmarklet.js`](../src/bookmarklet.js) | Full 49-check QA engine across 4 pillars (Metadata, Content & Components, Responsive, Accessibility) with in-page UI panel |
+| [`build-bookmarklet.js`](../scripts/build.js) | Build script to minify & encode bookmarklet into `javascript:` URL |
+| [`AEM_QA_BOOKMARK.txt`](../dist/AEM_QA_BOOKMARK_HOSTED.txt) | Minified bookmarklet URL ready to add to browser bookmarks |
+| [`server.js`](../server.js) | Zero-dependency HTTP report server & REST API (runs on `http://localhost:3500`) |
+| [`public/index.html`](../public/index.html) | Modern dark-mode Dashboard UI for history & detailed audit inspection |
+| [`public/style.css`](../public/style.css) | Custom styling for the dashboard |
+| [`public/app.js`](../public/app.js) | Dashboard client application logic |
 
 ---
 
@@ -21,7 +21,7 @@ We have built the complete zero-dependency **AEM QA Framework** prototype inside
 ### 1. Install the Bookmarklet in Browser (One-Time Setup)
 
 1. Open your Web Browser (Chrome, Edge, Firefox, Safari).
-2. Open the file [`AEM_QA_BOOKMARK.txt`](file:///g:/git%20repo/QA/aem-qa-tool/AEM_QA_BOOKMARK.txt) and copy its entire content (starts with `javascript:`).
+2. Open the file [`AEM_QA_BOOKMARK.txt`](../dist/AEM_QA_BOOKMARK_HOSTED.txt) and copy its entire content (starts with `javascript:`).
 3. Create a new Bookmark in your browser:
    - **Name:** `AEM QA`
    - **URL:** Paste the copied text.
