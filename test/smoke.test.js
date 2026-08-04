@@ -46,7 +46,7 @@ function req(method, urlPath, body, headers) {
     new Function(fs.readFileSync(path.join(ROOT, 'src/bookmarklet.js'), 'utf8'));
   });
 
-  var variants = ['LOCAL', 'HOSTED'];
+  var variants = ['LOCAL_FULL', 'LOCAL_QUICK', 'HOSTED_FULL', 'HOSTED_QUICK'];
   variants.forEach(function (v) {
     var file = path.join(ROOT, 'dist', 'AEM_QA_BOOKMARK_' + v + '.txt');
     test('compiled payload ' + v + ' parses as JavaScript', function () {
@@ -69,9 +69,38 @@ function req(method, urlPath, body, headers) {
 
   await test('minifier preserves "//" inside string literals', function () {
     var code = decodeURIComponent(
-      fs.readFileSync(path.join(ROOT, 'dist/AEM_QA_BOOKMARK_LOCAL.txt'), 'utf8').slice('javascript:'.length));
+      fs.readFileSync(path.join(ROOT, 'dist/AEM_QA_BOOKMARK_LOCAL_FULL.txt'), 'utf8').slice('javascript:'.length));
     assert.ok(code.indexOf('http://localhost:3500/api/report') !== -1,
       'endpoint URL was mangled by comment stripping');
+  });
+
+  await test('unsuffixed aliases still exist and are the full audit', function () {
+    ['LOCAL', 'HOSTED'].forEach(function (n) {
+      var alias = path.join(ROOT, 'dist', 'AEM_QA_BOOKMARK_' + n + '.txt');
+      assert.ok(fs.existsSync(alias), 'missing alias ' + n);
+      var code = decodeURIComponent(fs.readFileSync(alias, 'utf8').slice('javascript:'.length));
+      assert.ok(/BUILD_MODE = "full"/.test(code), n + ' alias is not the full audit');
+    });
+  });
+
+  // ── Audit modes ────────────────────────────────────────────────────────
+  console.log('\naudit modes');
+
+  await test('each payload bakes in its own mode', function () {
+    [['LOCAL_FULL', 'full'], ['LOCAL_QUICK', 'quick'],
+     ['HOSTED_FULL', 'full'], ['HOSTED_QUICK', 'quick']].forEach(function (pair) {
+      var code = decodeURIComponent(fs.readFileSync(
+        path.join(ROOT, 'dist', 'AEM_QA_BOOKMARK_' + pair[0] + '.txt'), 'utf8').slice('javascript:'.length));
+      var m = code.match(/BUILD_MODE = "([a-z]+)"/);
+      assert.ok(m, pair[0] + ': mode was not injected');
+      assert.strictEqual(m[1], pair[1], pair[0] + ' baked mode ' + m[1]);
+    });
+  });
+
+  await test('quick and full payloads differ', function () {
+    var q = fs.readFileSync(path.join(ROOT, 'dist/AEM_QA_BOOKMARK_LOCAL_QUICK.txt'), 'utf8');
+    var f = fs.readFileSync(path.join(ROOT, 'dist/AEM_QA_BOOKMARK_LOCAL_FULL.txt'), 'utf8');
+    assert.notStrictEqual(q, f, 'quick and full compiled identically — the mode split is not taking effect');
   });
 
   // ── Server ─────────────────────────────────────────────────────────────
@@ -107,6 +136,29 @@ function req(method, urlPath, body, headers) {
     new Function(decodeURIComponent(res.body.trim().slice('javascript:'.length)));
   });
 
+  await test('GET /api/bookmarklet?mode=quick serves the quick payload', async function () {
+    var res = await req('GET', '/api/bookmarklet?mode=quick');
+    assert.strictEqual(res.status, 200);
+    var code = decodeURIComponent(res.body.trim().slice('javascript:'.length));
+    new Function(code);
+    assert.ok(/BUILD_MODE = "quick"/.test(code), 'served payload is not quick mode');
+  });
+
+  await test('a quick report keeps its score null rather than 0', async function () {
+    var payload = JSON.stringify({
+      meta: { url: 'https://example.com/quick', overallScore: null, status: 'PASS',
+              auditMode: 'quick', p1FailCount: 0, auditedAt: '2026-08-04T11:00:00Z' },
+      defects: []
+    });
+    var post = await req('POST', '/api/report', payload, { 'Content-Type': 'application/json' });
+    assert.strictEqual(post.status, 200);
+    var list = JSON.parse((await req('GET', '/api/reports')).body);
+    var row = list.filter(function (r) { return r.url.indexOf('/quick') !== -1; })[0];
+    assert.ok(row, 'quick report missing from listing');
+    assert.strictEqual(row.score, null, 'null score was coerced to ' + row.score + ' — a clean quick scan would render as a failure');
+    assert.strictEqual(row.auditMode, 'quick');
+  });
+
   var savedId = null;
   await test('POST /api/report persists a report', async function () {
     var payload = JSON.stringify({
@@ -125,9 +177,12 @@ function req(method, urlPath, body, headers) {
     var res = await req('GET', '/api/reports');
     assert.strictEqual(res.status, 200);
     var list = JSON.parse(res.body);
-    assert.strictEqual(list.length, 1);
-    assert.strictEqual(list[0].score, 88);
-    assert.strictEqual(list[0].defectsCount, 1);
+    // Located by id rather than position: other tests in this file also post
+    // reports, and asserting on list[0] would couple this to their ordering.
+    var row = list.filter(function (r) { return r.id === savedId; })[0];
+    assert.ok(row, 'saved report is not in the listing');
+    assert.strictEqual(row.score, 88);
+    assert.strictEqual(row.defectsCount, 1);
   });
 
   await test('GET /api/report-details returns the requested report', async function () {

@@ -8,7 +8,22 @@
   // default > localhost. '__QA_ENDPOINT__' is substituted by scripts/build.js;
   // when it survives unsubstituted we are running from source, so ignore it.
   var BUILD_ENDPOINT = '__QA_ENDPOINT__';
+  var BUILD_MODE = '__QA_MODE__';
   var userConfig = window.__AEM_QA_CONFIG__ || {};
+
+  // ─── AUDIT MODE ─────────────────────────────────────────────────────
+  //   'full'  — all 49 checks, every link verified. The health assessment.
+  //   'quick' — the 15 P1 blockers only, links sampled. Answers the single
+  //             question "is anything blocking go-live?" in seconds.
+  //
+  // Both modes reach the SAME go/no-go verdict, because getGoNoGo() keys off
+  // P1 failures alone. Quick mode drops the P2/P3/P4 detail, not the verdict.
+  function resolveMode() {
+    if (userConfig.mode === 'quick' || userConfig.mode === 'full') return userConfig.mode;
+    if (BUILD_MODE === 'quick' || BUILD_MODE === 'full') return BUILD_MODE;
+    return 'full';
+  }
+  var auditMode = resolveMode();
 
   function resolveEndpoint() {
     if (userConfig.reportServer) return userConfig.reportServer;
@@ -32,13 +47,21 @@
 
   // ─── CONFIG ─────────────────────────────────────────────────────────
   var CONFIG = {
-    version: '3.0.0',
+    version: '3.1.0',
     panelId: 'aem-qa-panel',
     thresholdScore: 80,
     linkBatchSize: 5,
     linkTimeout: 5000,
     reportServer: reportServerUrl,
     reportOrigin: reportOrigin,
+
+    mode: auditMode,
+    // Quick mode samples rather than exhaustively verifying links, so a
+    // link-heavy page cannot turn a "quick" scan into a 15-second one. The
+    // sample size and the shorter timeout are both reported, so a sampled
+    // pass is never mistaken for a clean bill of health.
+    quickLinkSample: typeof userConfig.quickLinkSample === 'number' ? userConfig.quickLinkSample : 25,
+    quickLinkTimeout: typeof userConfig.quickLinkTimeout === 'number' ? userConfig.quickLinkTimeout : 2000,
 
     // 'panel' = interactive side panel (default). 'toast' = fire-and-forget:
     // run, show a small toast, auto-send, no panel.
@@ -242,6 +265,18 @@
     results.content = checkContent();
     results.responsive = checkResponsive();
     results.accessibility = checkAccessibility();
+
+    // Every check is computed either way — the synchronous pass costs ~50ms, so
+    // filtering before running would save nothing. Quick mode discards the
+    // non-blocking results here instead, which keeps one code path for the
+    // checks themselves and guarantees the two modes can never disagree about
+    // a P1 verdict.
+    if (CONFIG.mode === 'quick') {
+      ['metadata', 'content', 'responsive', 'accessibility'].forEach(function (pillar) {
+        results[pillar] = results[pillar].filter(function (c) { return c.priority === 'P1'; });
+      });
+    }
+
     finalizeScores();
     renderPartialResults();
   }
@@ -983,6 +1018,18 @@
       return true;
     });
 
+    // Quick mode: sample rather than exhaust. Record what was left out so the
+    // result can say "25 of 300 sampled" instead of implying full coverage.
+    var linkTotalFound = uniqueLinks.length;
+    var linksSampled = false;
+    if (CONFIG.mode === 'quick') {
+      CONFIG.linkTimeout = CONFIG.quickLinkTimeout;
+      if (uniqueLinks.length > CONFIG.quickLinkSample) {
+        uniqueLinks = uniqueLinks.slice(0, CONFIG.quickLinkSample);
+        linksSampled = true;
+      }
+    }
+
     var ctaEls = getCTAs();
     var ctaLinks = ctaEls
       .filter(function (el) { return el.tagName === 'A' && el.getAttribute('href'); })
@@ -1097,9 +1144,15 @@
       label: 'Internal links resolve (not 404)',
       status: broken.length === 0 ? 'pass' : 'fail',
       detail: (broken.length === 0
-        ? 'All ' + uniqueLinks.length + ' internal links resolve correctly'
-        : broken.length + ' broken link(s) found')
+        ? (linksSampled
+            ? 'No broken links in a sample of ' + uniqueLinks.length + ' of ' + linkTotalFound + ' — NOT full coverage'
+            : 'All ' + uniqueLinks.length + ' internal links resolve correctly')
+        : broken.length + ' broken link(s) found'
+            + (linksSampled ? ' in a sample of ' + uniqueLinks.length + ' of ' + linkTotalFound : ''))
         + (unverified > 0 ? ' (' + unverified + ' cross-origin link(s) reachable but status unreadable)' : ''),
+      sampled: linksSampled,
+      linksChecked: uniqueLinks.length,
+      linksFound: linkTotalFound,
       items: broken
     });
 
@@ -1329,22 +1382,44 @@
     var allChecks = [].concat(results.metadata, results.content, results.responsive, results.accessibility);
     var p1Fails = allChecks.filter(function (c) { return c.priority === 'P1' && c.status === 'fail'; }).length;
 
+    // Quick mode headlines the blocker count, not a score. Only P1 checks ran,
+    // so a 0-100 would read high (all P2/P3 issues invisible) and invite a
+    // false comparison against full-audit numbers.
+    var isQuick = CONFIG.mode === 'quick';
+    var headline = isQuick
+      ? [
+          '  <div>',
+          '    <div style="font-size:11px;color:#9CA3AF;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Go-live blockers</div>',
+          '    <div class="qa-scr-v ' + (p1Fails ? 'f' : 'p') + '">' + p1Fails + '<span style="font-size:16px;">/' + allChecks.length + ' P1</span></div>',
+          '  </div>'
+        ].join('')
+      : [
+          '  <div>',
+          '    <div style="font-size:11px;color:#9CA3AF;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Overall Health</div>',
+          '    <div class="qa-scr-v ' + statusClass + '">' + overall + '<span style="font-size:16px;">/100</span></div>',
+          '  </div>'
+        ].join('');
+
     sc.innerHTML = [
       '<div class="qa-scr-hdr">',
-      '  <div>',
-      '    <div style="font-size:11px;color:#9CA3AF;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Overall Health</div>',
-      '    <div class="qa-scr-v ' + statusClass + '">' + overall + '<span style="font-size:16px;">/100</span></div>',
-      '  </div>',
+      headline,
       '  <div class="qa-status-tag ' + g.status + '">' + g.status.replace(/_/g, ' ') + '</div>',
       '</div>',
+      isQuick
+        ? '<div style="font-size:10px;color:#9CA3AF;background:rgba(20,80,245,.12);border:1px solid #1450F5;border-radius:6px;padding:6px 9px;margin-bottom:8px;line-height:1.5;">⚡ <b>Quick scan</b> — P1 blockers only, links sampled. Run a full audit for the complete 49-check picture.</div>'
+        : '',
       '<div class="qa-bar"><div class="qa-fill" style="width:' + overall + '%;background:' + fillBg + ';"></div></div>',
       p1Fails > 0 ? '<div class="qa-p1a">🚨 BLOCKS GO-LIVE — ' + p1Fails + ' P1 Critical Failure(s)</div>' : '',
-      '<div class="qa-p-scores">',
-      '  <div class="qa-p-card"><div class="qa-p-val">' + overallScores.metadata + '%</div><div class="qa-p-lbl">Meta</div></div>',
-      '  <div class="qa-p-card"><div class="qa-p-val">' + overallScores.content + '%</div><div class="qa-p-lbl">Content</div></div>',
-      '  <div class="qa-p-card"><div class="qa-p-val">' + overallScores.responsive + '%</div><div class="qa-p-lbl">Resp</div></div>',
-      '  <div class="qa-p-card"><div class="qa-p-val">' + overallScores.accessibility + '%</div><div class="qa-p-lbl">A11y</div></div>',
-      '</div>'
+      // Per-pillar percentages are omitted in quick mode: derived from P1s
+      // alone they are not the pillar health a reader would assume.
+      isQuick ? '' : [
+        '<div class="qa-p-scores">',
+        '  <div class="qa-p-card"><div class="qa-p-val">' + overallScores.metadata + '%</div><div class="qa-p-lbl">Meta</div></div>',
+        '  <div class="qa-p-card"><div class="qa-p-val">' + overallScores.content + '%</div><div class="qa-p-lbl">Content</div></div>',
+        '  <div class="qa-p-card"><div class="qa-p-val">' + overallScores.responsive + '%</div><div class="qa-p-lbl">Resp</div></div>',
+        '  <div class="qa-p-card"><div class="qa-p-val">' + overallScores.accessibility + '%</div><div class="qa-p-lbl">A11y</div></div>',
+        '</div>'
+      ].join('\n')
     ].join('\n');
   }
 
@@ -1425,10 +1500,17 @@
         auditedAt: new Date().toISOString(),
         toolVersion: CONFIG.version,
         viewport: window.innerWidth,
-        overallScore: overallScores.overall,
+        // A quick scan runs only P1 checks, so its 0-100 would skew high — a
+        // page failing ten P2s but no P1 would score 100. Publishing that
+        // number next to full-audit scores would be actively misleading, so
+        // quick reports carry a verdict and a blocker count instead.
+        overallScore: CONFIG.mode === 'quick' ? null : overallScores.overall,
         threshold: CONFIG.thresholdScore,
         status: overallScores.goNoGo.status,
         goNoGo: overallScores.goNoGo.status,
+        auditMode: CONFIG.mode,
+        checksRun: allChecks.length,
+        checksAvailable: CONFIG.mode === 'quick' ? 15 : 49,
         p1FailCount: allChecks.filter(function (c) { return c.priority === 'P1' && c.status === 'fail'; }).length
       },
       scores: {
@@ -1530,51 +1612,99 @@
     alert('Report copied to clipboard in Markdown format!');
   }
 
-  async function sendToServer() {
-    var data = buildReportPayload();
+  // Diagnose a delivery failure into something the operator can act on. A bare
+  // "failed to fetch" is indistinguishable between a typo'd endpoint, a blocked
+  // scheme and a server that is simply down.
+  function explainDeliveryFailure(err) {
+    var target = CONFIG.reportServer;
+    var isHttps = location.protocol === 'https:';
+    var targetIsHttp = /^http:\/\//i.test(target);
+
+    if (isHttps && targetIsHttp) {
+      return 'Blocked as mixed content: this page is HTTPS but the dashboard '
+        + 'endpoint is HTTP (' + target + '). Rebuild the bookmarklet against '
+        + 'your HTTPS dashboard URL.';
+    }
+    if (/localhost|127\.0\.0\.1/.test(target) && location.hostname !== 'localhost') {
+      return 'The bookmarklet is pointing at ' + target + ', which only exists '
+        + 'on your own machine. Rebuild it with --endpoint <your dashboard>/api/report.';
+    }
+    return 'Could not reach ' + target + ' (' + (err && err.message ? err.message : 'network error')
+      + '). Check the dashboard is running and the URL is correct.';
+  }
+
+  async function deliverReport(data) {
     var payload = { type: 'AEM_QA_REPORT', report: data };
 
-    // ── 1. PRIMARY: postMessage to dashboard opener ──────────────────────────
-    // Targeted at the dashboard origin specifically. Audit payloads embed
-    // internal author/stage URLs and page content, so broadcasting them to '*'
-    // would hand them to any window that happens to be listening.
+    // ── Fast paths ───────────────────────────────────────────────────────────
+    // Neither confirms delivery, so neither is allowed to report success. They
+    // exist to make the dashboard update instantly when it happens to be
+    // listening; the HTTP POST below is the authoritative channel.
+    //
+    // postMessage is targeted at the dashboard origin, never '*' — audit
+    // payloads embed internal author/stage URLs and page content.
     if (window.opener && !window.opener.closed && CONFIG.reportOrigin) {
       try { window.opener.postMessage(payload, CONFIG.reportOrigin); } catch (ex) {}
     }
-
-    // ── 2. SECONDARY: BroadcastChannel for same-origin tabs ──────────────────
+    // BroadcastChannel only reaches same-origin tabs, so for a real AEM audit
+    // (page origin ≠ dashboard origin) this is a no-op. Kept for the case where
+    // the dashboard and the audited page are served from the same host.
     try {
       var bc = new BroadcastChannel('aem_qa_channel');
       bc.postMessage(payload);
       bc.close();
     } catch (ex) {}
 
-    // ── 3. TERTIARY: Silent HTTP POST fallback (never blocks or alerts) ───────
+    // ── Authoritative path: awaited, with the real outcome returned ──────────
+    var headers = { 'Content-Type': 'application/json' };
+    if (CONFIG.apiToken) headers['X-QA-Token'] = CONFIG.apiToken;
+
     try {
-      var headers = { 'Content-Type': 'application/json' };
-      if (CONFIG.apiToken) headers['X-QA-Token'] = CONFIG.apiToken;
-      fetch(CONFIG.reportServer, {
+      var res = await fetch(CONFIG.reportServer, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(data)
-      }).catch(function () {});
-    } catch (ex) {}
+      });
 
-    // ── 4. Center-screen completion dialog (exactly like TCM Extractor) ───────
+      if (res.ok) return { ok: true, message: 'Report delivered to the dashboard' };
+
+      if (res.status === 401) {
+        return { ok: false, message: 'Rejected (401): the dashboard requires an API token. '
+          + 'Rebuild the bookmarklet with --token, or clear QA_API_TOKEN on the server.' };
+      }
+      var body = '';
+      try { body = (await res.json()).error || ''; } catch (e) {}
+      return { ok: false, message: 'Dashboard rejected the report (HTTP ' + res.status + ')'
+        + (body ? ': ' + body : '') };
+    } catch (err) {
+      return { ok: false, message: explainDeliveryFailure(err) };
+    }
+  }
+
+  async function sendToServer() {
+    var data = buildReportPayload();
+
+    // ── Center-screen completion dialog ──────────────────────────────────────
     var score = data.meta.overallScore;
     var goNoGo = data.meta.goNoGo || 'UNKNOWN';
     var isPass = goNoGo === 'PASS' || goNoGo === 'PASS_WITH_WARNINGS';
-    var gc = isPass ? '#00e5b0' : (score >= 50 ? '#ffb84f' : '#ff4f6a');
-    var icon = isPass ? '✅' : (score >= 50 ? '⚠️' : '❌');
+    var gc = isPass ? '#00e5b0' : ((score === null || score >= 50) ? '#ffb84f' : '#ff4f6a');
+    var icon = isPass ? '✅' : ((score === null || score >= 50) ? '⚠️' : '❌');
     var shortU = location.href.length > 68 ? location.href.slice(0, 68) + '…' : location.href;
+
+    // Quick scans have no comparable 0-100, so headline the blocker count.
+    var headlineValue = data.meta.auditMode === 'quick'
+      ? data.meta.p1FailCount + ' blocker' + (data.meta.p1FailCount === 1 ? '' : 's')
+      : score + ' / 100';
 
     var inner = '<div style="background:#1a1f2e;border-radius:14px;padding:28px 32px;max-width:420px;width:88%;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.75);border:2px solid ' + gc + ';box-sizing:border-box;font-family:system-ui,sans-serif">'
       + '<div style="font-size:2.2rem;margin-bottom:10px">' + icon + '</div>'
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:' + gc + ';margin-bottom:14px">AEM QA Audit Complete</div>'
-      + '<div style="background:#0d0f18;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px 18px;font-family:monospace;font-size:22px;font-weight:700;color:' + gc + ';letter-spacing:2px;margin-bottom:12px">' + score + ' / 100</div>'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:' + gc + ';margin-bottom:14px">AEM QA '
+      + (data.meta.auditMode === 'quick' ? 'Quick Scan' : 'Audit') + ' Complete</div>'
+      + '<div style="background:#0d0f18;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px 18px;font-family:monospace;font-size:22px;font-weight:700;color:' + gc + ';letter-spacing:2px;margin-bottom:12px">' + headlineValue + '</div>'
       + '<div style="color:#9ca3af;font-size:12px;margin-bottom:8px">Status: <b style="color:' + gc + '">' + goNoGo + '</b></div>'
       + '<div style="font-size:10px;color:#3d4870;margin-bottom:14px;word-break:break-all;overflow:hidden;max-height:26px">' + shortU + '</div>'
-      + '<div id="__qaaudcl__" style="font-size:11px;color:#6b7599;background:#0d0f18;border-radius:6px;padding:6px 14px;display:inline-block">Sending to QA Dashboard — closing in 3s</div>'
+      + '<div id="__qaaudcl__" style="font-size:11px;color:#6b7599;background:#0d0f18;border-radius:6px;padding:6px 14px;display:block;line-height:1.5">📡 Sending to the QA dashboard…</div>'
       + '</div>';
 
     // Try <dialog>.showModal() — browser top-layer, beats ALL z-index/overflow:hidden
@@ -1600,15 +1730,54 @@
       (document.body || document.documentElement).appendChild(ov);
     }
 
-    setTimeout(function () {
-      var el = document.getElementById('__qaaudcl__');
-      if (el) el.textContent = 'Sent! Closing…';
-    }, 2200);
-    setTimeout(function () {
-      var el = document.getElementById('__qaaud__');
-      if (el) el.remove();
-      updateToast('✅ ' + score + '/100 — ' + goNoGo + ' — synced to dashboard!', 100, false, true);
-    }, 3000);
+    // Report what actually happened. This used to say "Sent!" on a timer
+    // regardless of the outcome, so a report that never left the browser looked
+    // identical to one the dashboard had stored.
+    var outcome = await deliverReport(data);
+    var status = document.getElementById('__qaaudcl__');
+
+    if (outcome.ok) {
+      if (status) {
+        status.style.color = '#00e5b0';
+        status.textContent = '✅ ' + outcome.message + ' — closing…';
+      }
+      updateToast('✅ ' + headlineValue + ' — ' + goNoGo + ' — delivered to dashboard', 100, false, true);
+      setTimeout(function () {
+        var el = document.getElementById('__qaaud__');
+        if (el) el.remove();
+      }, 2200);
+      return;
+    }
+
+    // Failure: keep the dialog open, explain why, and leave the operator a way
+    // to salvage the result rather than silently losing the audit.
+    if (status) {
+      status.style.color = '#ff4f6a';
+      status.innerHTML = '❌ <b>Not delivered.</b><br>' + escapeHtmlText(outcome.message)
+        + '<br><br><button id="__qaretry__" style="background:#1450F5;color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:11px;cursor:pointer;margin-right:6px">Retry</button>'
+        + '<button id="__qadl__" style="background:#2a3350;color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:11px;cursor:pointer;margin-right:6px">Download JSON</button>'
+        + '<button id="__qaclose__" style="background:none;color:#6b7599;border:none;font-size:11px;cursor:pointer">Close</button>';
+
+      var retry = document.getElementById('__qaretry__');
+      if (retry) retry.addEventListener('click', function () {
+        var el = document.getElementById('__qaaud__');
+        if (el) el.remove();
+        sendToServer();
+      });
+      var dl = document.getElementById('__qadl__');
+      if (dl) dl.addEventListener('click', exportJSON);
+      var cl = document.getElementById('__qaclose__');
+      if (cl) cl.addEventListener('click', function () {
+        var el = document.getElementById('__qaaud__');
+        if (el) el.remove();
+      });
+    }
+    updateToast('❌ Report not delivered — ' + outcome.message, 100, true, false);
+  }
+
+  function escapeHtmlText(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   // ─── BOOT ─────────────────────────────────────────────────────────────

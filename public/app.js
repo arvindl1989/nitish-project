@@ -50,19 +50,32 @@
   // every bookmarklet installed from this dashboard threw on click.
   var CLOUD_BOOKMARKLET_JS = "";
 
-  function loadBookmarklet() {
-    return fetch("/api/bookmarklet")
+  var QUICK_BOOKMARKLET_JS = "";
+
+  function fetchBookmarklet(mode, linkId) {
+    return fetch("/api/bookmarklet?mode=" + mode)
       .then(function (r) { return r.ok ? r.text() : Promise.reject(new Error("HTTP " + r.status)); })
       .then(function (text) {
-        CLOUD_BOOKMARKLET_JS = text.trim();
-        var dragLink = document.getElementById("drag-bookmarklet-link");
-        if (dragLink) dragLink.setAttribute("href", CLOUD_BOOKMARKLET_JS);
-        return CLOUD_BOOKMARKLET_JS;
+        var code = text.trim();
+        var link = document.getElementById(linkId);
+        if (link) link.setAttribute("href", code);
+        return code;
       })
       .catch(function (err) {
-        showLaunchBanner("error", "Could not load the bookmarklet from the server (" + err.message + "). Run: npm run build");
+        showLaunchBanner("error", "Could not load the " + mode + " bookmarklet from the server (" + err.message + "). Run: npm run build");
         return "";
       });
+  }
+
+  function loadBookmarklet() {
+    return Promise.all([
+      fetchBookmarklet("full", "drag-bookmarklet-link"),
+      fetchBookmarklet("quick", "drag-bookmarklet-quick")
+    ]).then(function (pair) {
+      CLOUD_BOOKMARKLET_JS = pair[0];
+      QUICK_BOOKMARKLET_JS = pair[1];
+      return CLOUD_BOOKMARKLET_JS;
+    });
   }
 
   // Resolves once the payload is available, so click handlers never copy an
@@ -76,17 +89,22 @@
   function initApp() {
     bookmarkletReady = loadBookmarklet();
 
-    var copyBtn = document.getElementById('copy-bookmark-btn');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', function () {
-        bookmarkletReady.then(function (code) {
+    [
+      { btn: 'copy-bookmark-btn', name: 'AEM QA — Full', get: function () { return CLOUD_BOOKMARKLET_JS; } },
+      { btn: 'copy-bookmark-quick-btn', name: 'AEM QA — Quick', get: function () { return QUICK_BOOKMARKLET_JS; } }
+    ].forEach(function (spec) {
+      var btn = document.getElementById(spec.btn);
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        bookmarkletReady.then(function () {
+          var code = spec.get();
           if (!code) return; // loadBookmarklet already surfaced the error
           navigator.clipboard.writeText(code).then(function () {
-            alert('✅ Bookmarklet copied to clipboard!\n\nTo install:\n1. Right-click your browser Bookmarks Bar -> "Add Page..."\n2. Name: AEM QA Auditor\n3. Paste this copied code into the URL field.');
+            alert('✅ "' + spec.name + '" copied to clipboard!\n\nTo install:\n1. Right-click your browser Bookmarks Bar -> "Add Page..."\n2. Name: ' + spec.name + '\n3. Paste this copied code into the URL field.');
           });
         });
       });
-    }
+    });
 
     var launchBtn = document.getElementById('launch-audit-btn');
     var targetInput = document.getElementById('target-url-input');
@@ -242,17 +260,30 @@
     }
 
     listContainer.innerHTML = items.map(function (item) {
-      var scoreClass = item.score >= 80 ? (item.score >= 90 ? 'p' : 'w') : 'f';
+      var isQuick = item.auditMode === 'quick';
       var timeStr = item.auditedAt ? new Date(item.auditedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+      // A quick scan ran only the 15 P1 checks, so it has no 0-100 comparable
+      // to a full audit. Show its blocker count instead of parking a number in
+      // the score column where it would read as the same measurement.
+      var scoreClass, scoreText;
+      if (isQuick) {
+        scoreClass = item.blockerCount ? 'f' : 'p';
+        scoreText = (item.blockerCount || 0) + '<span style="font-size:10px;opacity:.75"> blk</span>';
+      } else {
+        scoreClass = item.score >= 80 ? (item.score >= 90 ? 'p' : 'w') : 'f';
+        scoreText = (item.score === null || item.score === undefined) ? '—' : item.score;
+      }
 
       return [
         '<div class="report-item" data-id="' + item.id + '">',
         '  <div class="item-top">',
         '    <span class="item-url" title="' + item.url + '">' + item.url + '</span>',
-        '    <span class="item-score ' + scoreClass + '">' + item.score + '</span>',
+        '    <span class="item-score ' + scoreClass + '">' + scoreText + '</span>',
         '  </div>',
         '  <div class="item-meta">',
         '    <span class="status-chip ' + item.status + '">' + (item.status || 'UNKNOWN').replace(/_/g, ' ') + '</span>',
+        isQuick ? '    <span class="mode-chip" title="Quick scan: 15 P1 blockers, links sampled">⚡ QUICK</span>' : '',
         '    <span>' + timeStr + '</span>',
         '  </div>',
         '</div>'

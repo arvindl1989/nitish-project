@@ -123,8 +123,12 @@ function listReports() {
         id: f.replace(/\.json$/, ''),
         file: f,
         url: meta.url || 'Unknown',
-        score: typeof meta.overallScore === 'number' ? meta.overallScore : 0,
+        // null for quick scans, which have no comparable 0-100. Coercing that
+        // to 0 would render a clean quick scan as a catastrophic score.
+        score: typeof meta.overallScore === 'number' ? meta.overallScore : null,
         status: meta.status || meta.goNoGo || 'UNKNOWN',
+        auditMode: meta.auditMode || 'full',
+        blockerCount: typeof meta.p1FailCount === 'number' ? meta.p1FailCount : null,
         auditedAt: meta.auditedAt || '',
         defectsCount: Array.isArray(data.defects) ? data.defects.length : 0
       };
@@ -234,7 +238,8 @@ var server = http.createServer(async function (req, res) {
   // the current engine, instead of a copy pasted into the page months ago.
   if (req.method === 'GET' && route === '/bookmarklet') {
     var variant = parsed.query.variant === 'local' ? 'LOCAL' : 'HOSTED';
-    var payload = path.join(__dirname, 'dist', 'AEM_QA_BOOKMARK_' + variant + '.txt');
+    var mode = parsed.query.mode === 'quick' ? 'QUICK' : 'FULL';
+    var payload = path.join(__dirname, 'dist', 'AEM_QA_BOOKMARK_' + variant + '_' + mode + '.txt');
     if (!fs.existsSync(payload)) {
       return sendJson(res, 503, { error: 'Bookmarklet not built yet. Run: npm run build' });
     }
