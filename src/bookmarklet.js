@@ -196,7 +196,7 @@
 
     if (CONFIG.ui === 'toast') {
       // Link checking occupies the 40–90% band of the toast progress bar.
-      updateToast('🔗 Checking links… ' + done + '/' + total, 40 + Math.round(pct * 0.5));
+      updateToast('Checking links… ' + done + '/' + total, 40 + Math.round(pct * 0.5));
       return;
     }
 
@@ -1171,7 +1171,7 @@
     finalizeScores();
 
     if (CONFIG.ui === 'toast') {
-      updateToast('📡 Sending report to dashboard…', 90);
+      updateToast('Sending report to dashboard…', 90);
       sendToServer();
     } else {
       renderFinalResults();
@@ -1239,69 +1239,73 @@
     var style = document.createElement('style');
     style.id = 'aem-qa-styles';
     style.textContent = [
-      '#aem-qa-panel * { box-sizing:border-box; font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif; }',
-      '#aem-qa-panel { position:fixed; top:0; right:0; width:390px; height:100vh;',
-      '  background:#0A0F1E; color:#F9FAFB; z-index:2147483647;',
-      '  display:flex; flex-direction:column; box-shadow:-4px 0 32px rgba(0,0,0,.65); font-size:13px; overflow:hidden; }',
-      '#aem-qa-panel .qa-hdr { background:#1450F5; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }',
-      '#aem-qa-panel .qa-hdr h1 { font-size:15px; font-weight:700; margin:0; color:#fff; display:flex; align-items:center; gap:8px; }',
-      '#aem-qa-panel .qa-hdr button { background:rgba(255,255,255,.2); border:none; color:#fff; cursor:pointer; padding:4px 8px; border-radius:4px; font-size:12px; font-weight:600; }',
-      '#aem-qa-panel .qa-hdr button:hover { background:rgba(255,255,255,.3); }',
-      '#aem-qa-panel .qa-meta { padding:10px 16px; background:#111827; border-bottom:1px solid #1F2937; font-size:11px; color:#9CA3AF; flex-shrink:0; display:flex; justify-content:space-between; }',
-      '#aem-qa-panel .qa-scr { padding:12px 16px; background:#111827; border-bottom:1px solid #1F2937; flex-shrink:0; }',
-      '#aem-qa-panel .qa-scr-hdr { display:flex; align-items:baseline; justify-content:space-between; }',
-      '#aem-qa-panel .qa-scr-v { font-size:32px; font-weight:800; line-height:1; }',
-      '#aem-qa-panel .qa-scr-v.p { color:#10B981; }',
-      '#aem-qa-panel .qa-scr-v.w { color:#F59E0B; }',
-      '#aem-qa-panel .qa-scr-v.f { color:#EF4444; }',
-      '#aem-qa-panel .qa-status-tag { padding:4px 8px; border-radius:4px; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; }',
-      '#aem-qa-panel .qa-status-tag.BLOCK { background:#7F1D1D; color:#FCA5A5; border:1px solid #DC2626; }',
-      '#aem-qa-panel .qa-status-tag.PASS { background:#064E3B; color:#A7F3D0; border:1px solid #10B981; }',
-      '#aem-qa-panel .qa-status-tag.PASS_WITH_WARNINGS { background:#78350F; color:#FDE68A; border:1px solid #F59E0B; }',
-      '#aem-qa-panel .qa-status-tag.CONDITIONAL { background:#78350F; color:#FDE68A; border:1px solid #F59E0B; }',
-      '#aem-qa-panel .qa-status-tag.FAIL { background:#7F1D1D; color:#FCA5A5; border:1px solid #DC2626; }',
-      '#aem-qa-panel .qa-bar { height:6px; background:#1F2937; border-radius:3px; margin:8px 0 4px 0; overflow:hidden; }',
-      '#aem-qa-panel .qa-fill { height:100%; border-radius:3px; transition:width .4s; }',
-      '#aem-qa-panel .qa-p1a { background:rgba(220,38,38,.15); border:1px solid #DC2626; border-radius:6px; padding:6px 10px; margin-top:6px; color:#FCA5A5; font-size:12px; font-weight:600; display:flex; align-items:center; gap:6px; }',
-      '#aem-qa-panel .qa-p-scores { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:4px; margin-top:10px; text-align:center; font-size:10px; }',
-      '#aem-qa-panel .qa-p-card { background:#1F2937; padding:4px 2px; border-radius:4px; }',
-      '#aem-qa-panel .qa-p-val { font-weight:700; font-size:12px; color:#F3F4F6; }',
-      '#aem-qa-panel .qa-p-lbl { color:#9CA3AF; font-size:9px; text-transform:uppercase; margin-top:2px; }',
-      '#aem-qa-panel .qa-bod { flex:1; overflow-y:auto; padding:8px 0; }',
-      '#aem-qa-panel .qa-pil { border-bottom:1px solid #1F2937; }',
-      '#aem-qa-panel .qa-ph { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; cursor:pointer; user-select:none; background:#111827; }',
-      '#aem-qa-panel .qa-ph:hover { background:#1A2235; }',
-      '#aem-qa-panel .qa-pt { font-weight:600; font-size:13px; display:flex; align-items:center; gap:6px; }',
-      '#aem-qa-panel .qa-ps { font-size:12px; color:#9CA3AF; font-weight:600; }',
-      '#aem-qa-panel .qa-pb { display:none; padding:4px 0; }',
-      '#aem-qa-panel .qa-pb.open { display:block; }',
-      '#aem-qa-panel .qa-chk { padding:8px 16px; border-left:3px solid transparent; display:flex; align-items:flex-start; gap:8px; }',
-      '#aem-qa-panel .qa-chk.pass { border-color:#10B981; }',
-      '#aem-qa-panel .qa-chk.warn { border-color:#F59E0B; background:rgba(245,158,11,.05); }',
-      '#aem-qa-panel .qa-chk.fail { border-color:#EF4444; background:rgba(239,68,68,.07); }',
-      '#aem-qa-panel .qa-chk.info { border-color:#374151; }',
-      '#aem-qa-panel .qa-ci { flex-shrink:0; font-size:14px; }',
+      // KONE design system: blue + white lead, black for structure, sand as the
+      // one supporting neutral. Flat and high-key — no gradients, no blur, and
+      // a single soft edge shadow only so the panel separates from the page it
+      // overlays. Inter is sentence case and never blue; the ALL-CAPS labels
+      // carry the blue. No emoji anywhere.
+      '#aem-qa-panel, #aem-qa-panel * { box-sizing:border-box; font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }',
+      '#aem-qa-panel { position:fixed; top:0; right:0; width:400px; height:100vh;',
+      '  background:#FFFFFF; color:#141414; z-index:2147483647; border-left:1px solid #E6E6E6;',
+      '  display:flex; flex-direction:column; box-shadow:0 6px 20px rgba(20,20,20,.08); font-size:13px; line-height:1.5; overflow:hidden; }',
+      '#aem-qa-panel .qa-hdr { background:#1450F5; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }',
+      '#aem-qa-panel .qa-hdr h1 { font-size:15px; font-weight:400; margin:0; color:#fff; display:flex; align-items:center; gap:10px; letter-spacing:-0.005em; }',
+      '#aem-qa-panel .qa-hdr .qa-mark { display:flex; gap:2px; }',
+      '#aem-qa-panel .qa-hdr .qa-mark i { display:block; width:3px; height:14px; background:#fff; }',
+      '#aem-qa-panel .qa-hdr .qa-v { font-size:10px; opacity:.8; letter-spacing:.06em; text-transform:uppercase; }',
+      '#aem-qa-panel .qa-hdr button { background:transparent; border:1px solid rgba(255,255,255,.55); color:#fff; cursor:pointer; padding:5px 11px; border-radius:8px; font-size:12px; font-weight:600; transition:background 140ms ease; }',
+      '#aem-qa-panel .qa-hdr button:hover { background:rgba(255,255,255,.16); border-color:#fff; }',
+      '#aem-qa-panel .qa-meta { padding:10px 16px; background:#F3EEE6; border-bottom:1px solid #E6E6E6; font-size:11px; color:#727272; flex-shrink:0; display:flex; justify-content:space-between; gap:12px; }',
+      '#aem-qa-panel .qa-bod { flex:1; overflow-y:auto; padding:16px; }',
+      '#aem-qa-panel .qa-scr { background:#FFFFFF; border:1px solid #E6E6E6; border-radius:8px; padding:16px; margin-bottom:16px; }',
+      '#aem-qa-panel .qa-scr-hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; gap:12px; }',
+      '#aem-qa-panel .qa-scr-v { font-size:34px; font-weight:400; line-height:1; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }',
+      '#aem-qa-panel .qa-scr-v.p { color:#1ED273; } #aem-qa-panel .qa-scr-v.w { color:#FFA023; } #aem-qa-panel .qa-scr-v.f { color:#FF5F28; }',
+      '#aem-qa-panel .qa-status-tag { font-size:10px; letter-spacing:.05em; text-transform:uppercase; font-weight:600; padding:3px 8px; border-radius:4px; border:1px solid; white-space:nowrap; }',
+      '#aem-qa-panel .qa-status-tag.PASS { background:rgba(30,210,115,.16); color:#0B7A42; border-color:rgba(30,210,115,.45); }',
+      '#aem-qa-panel .qa-status-tag.PASS_WITH_WARNINGS, #aem-qa-panel .qa-status-tag.CONDITIONAL { background:rgba(255,160,35,.16); color:#96590A; border-color:rgba(255,160,35,.45); }',
+      '#aem-qa-panel .qa-status-tag.BLOCK, #aem-qa-panel .qa-status-tag.FAIL { background:rgba(255,95,40,.14); color:#B23A11; border-color:rgba(255,95,40,.4); }',
+      '#aem-qa-panel .qa-bar { height:4px; background:#E6E6E6; border-radius:2px; overflow:hidden; margin-bottom:12px; }',
+      '#aem-qa-panel .qa-fill { height:100%; border-radius:2px; transition:width .2s ease; }',
+      '#aem-qa-panel .qa-p1a { background:rgba(255,95,40,.10); border:1px solid rgba(255,95,40,.4); color:#B23A11; border-radius:8px; padding:8px 11px; font-size:12px; font-weight:600; margin-bottom:12px; }',
+      '#aem-qa-panel .qa-p-scores { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }',
+      '#aem-qa-panel .qa-p-card { background:#F3EEE6; border-radius:8px; padding:9px 10px; }',
+      '#aem-qa-panel .qa-p-val { font-size:17px; font-weight:400; font-variant-numeric:tabular-nums; letter-spacing:-.01em; }',
+      '#aem-qa-panel .qa-p-lbl { font-size:9px; color:#1450F5; text-transform:uppercase; letter-spacing:.06em; margin-top:2px; }',
+      '#aem-qa-panel .qa-pil { border:1px solid #E6E6E6; border-radius:8px; margin-bottom:12px; overflow:hidden; }',
+      '#aem-qa-panel .qa-ph { background:#F3EEE6; padding:10px 13px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; border-bottom:1px solid #E6E6E6; }',
+      '#aem-qa-panel .qa-pt { font-size:11px; font-weight:400; color:#1450F5; text-transform:uppercase; letter-spacing:.06em; }',
+      '#aem-qa-panel .qa-ps { font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; }',
+      '#aem-qa-panel .qa-pb { background:#fff; }',
+      '#aem-qa-panel .qa-chk { padding:9px 13px; border-bottom:1px solid #F0F0F0; display:flex; gap:9px; align-items:flex-start; border-left:3px solid transparent; }',
+      '#aem-qa-panel .qa-chk:last-child { border-bottom:none; }',
+      '#aem-qa-panel .qa-chk.pass { border-left-color:#1ED273; }',
+      '#aem-qa-panel .qa-chk.warn { border-left-color:#FFA023; background:rgba(255,160,35,.05); }',
+      '#aem-qa-panel .qa-chk.fail { border-left-color:#FF5F28; background:rgba(255,95,40,.06); }',
+      '#aem-qa-panel .qa-chk.info { border-left-color:#D0D0D0; }',
+      '#aem-qa-panel .qa-ci { flex-shrink:0; width:15px; height:15px; margin-top:1px; }',
+      '#aem-qa-panel .qa-ci svg { width:15px; height:15px; display:block; }',
+      '#aem-qa-panel .qa-chk.pass .qa-ci { color:#1ED273; } #aem-qa-panel .qa-chk.warn .qa-ci { color:#FFA023; }',
+      '#aem-qa-panel .qa-chk.fail .qa-ci { color:#FF5F28; } #aem-qa-panel .qa-chk.info .qa-ci { color:#A1A1A1; }',
       '#aem-qa-panel .qa-cb { flex:1; min-width:0; }',
-      '#aem-qa-panel .qa-cl { font-weight:500; font-size:12px; }',
-      '#aem-qa-panel .qa-cd { color:#9CA3AF; font-size:11px; margin-top:2px; word-break:break-word; }',
-      '#aem-qa-panel .qa-bg { font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px; letter-spacing:.5px; margin-right:4px; }',
-      '#aem-qa-panel .qa-bg.P1 { background:#7F1D1D; color:#FCA5A5; }',
-      '#aem-qa-panel .qa-bg.P2 { background:#7C2D12; color:#FED7AA; }',
-      '#aem-qa-panel .qa-bg.P3 { background:#713F12; color:#FEF08A; }',
-      '#aem-qa-panel .qa-bg.P4 { background:#374151; color:#9CA3AF; }',
-      '#aem-qa-panel .qa-items { margin-top:6px; }',
-      '#aem-qa-panel .qa-item { font-size:10px; color:#6B7280; padding:2px 0 2px 12px; border-left:1px solid #374151; margin-left:4px; word-break:break-all; }',
-      '#aem-qa-panel .qa-ftr { padding:10px 16px; background:#111827; border-top:1px solid #1F2937; display:flex; gap:6px; flex-wrap:wrap; flex-shrink:0; }',
-      '#aem-qa-panel .qa-ftr button { flex:1; padding:8px; border-radius:6px; border:1px solid #1F2937; background:#1A2235; color:#9CA3AF; cursor:pointer; font-size:11px; min-width:80px; font-weight:600; }',
-      '#aem-qa-panel .qa-ftr button:hover { background:#243148; color:#F9FAFB; }',
-      '#aem-qa-panel .qa-ftr button.primary { background:#1450F5; color:#fff; border-color:#1450F5; }',
-      '#aem-qa-panel .qa-ftr button.primary:hover { background:#1040C5; }',
-      '#aem-qa-panel .qa-bp { display:flex; gap:4px; margin-top:6px; }',
-      '#aem-qa-panel .qa-bp button { font-size:10px; padding:4px 8px; border-radius:4px; border:1px solid #374151; background:#1A2235; color:#9CA3AF; cursor:pointer; font-weight:600; }',
-      '#aem-qa-panel .qa-bp button:hover { background:#243148; color:#fff; }',
-      '#aem-qa-panel .qa-prg { padding:10px 16px; background:#111827; border-bottom:1px solid #1F2937; font-size:11px; color:#9CA3AF; flex-shrink:0; }',
-      '#aem-qa-panel .qa-pgb { height:4px; background:#1F2937; border-radius:2px; margin-top:6px; overflow:hidden; }',
-      '#aem-qa-panel .qa-pgf { height:100%; background:#1450F5; border-radius:2px; transition:width .2s; }'
+      '#aem-qa-panel .qa-cl { font-size:12px; font-weight:600; color:#141414; }',
+      '#aem-qa-panel .qa-cd { font-size:11px; color:#727272; margin-top:2px; }',
+      '#aem-qa-panel .qa-items { margin-top:5px; background:#F3EEE6; border-radius:4px; padding:6px 9px; }',
+      '#aem-qa-panel .qa-item { font-size:10px; color:#727272; margin-bottom:2px; word-break:break-all; }',
+      '#aem-qa-panel .qa-bg { font-size:9px; letter-spacing:.05em; padding:1px 5px; border-radius:4px; margin-right:5px; border:1px solid; text-transform:uppercase; }',
+      '#aem-qa-panel .qa-bg.P1 { color:#B23A11; border-color:rgba(255,95,40,.45); background:rgba(255,95,40,.12); }',
+      '#aem-qa-panel .qa-bg.P2 { color:#96590A; border-color:rgba(255,160,35,.45); background:rgba(255,160,35,.12); }',
+      '#aem-qa-panel .qa-bg.P3 { color:#727272; border-color:#D0D0D0; background:#F3EEE6; }',
+      '#aem-qa-panel .qa-bg.P4 { color:#A1A1A1; border-color:#E6E6E6; background:#fff; }',
+      '#aem-qa-panel .qa-ftr { padding:11px 16px; border-top:1px solid #E6E6E6; background:#fff; flex-shrink:0; }',
+      '#aem-qa-panel .qa-bp { display:flex; gap:7px; }',
+      '#aem-qa-panel .qa-bp button { flex:1; white-space:nowrap; font-size:11px; padding:8px 8px; border-radius:8px; border:1px solid #D0D0D0; background:#fff; color:#141414; cursor:pointer; font-weight:600; transition:background 140ms ease,border-color 140ms ease; }',
+      '#aem-qa-panel .qa-bp button:hover { background:#F3EEE6; border-color:#A1A1A1; }',
+      '#aem-qa-panel .qa-bp button.qa-primary { background:#1450F5; border-color:#1450F5; color:#fff; }',
+      '#aem-qa-panel .qa-bp button.qa-primary:hover { background:#4373F7; border-color:#4373F7; }',
+      '#aem-qa-panel .qa-prg { padding:10px 16px; background:#F3EEE6; border-bottom:1px solid #E6E6E6; font-size:11px; color:#727272; flex-shrink:0; }',
+      '#aem-qa-panel .qa-pgb { height:4px; background:#E6E6E6; border-radius:2px; margin-top:6px; overflow:hidden; }',
+      '#aem-qa-panel .qa-pgf { height:100%; background:#1450F5; border-radius:2px; transition:width .2s; }' 
     ].join('\n');
     document.head.appendChild(style);
   }
@@ -1311,8 +1315,8 @@
     panel.id = CONFIG.panelId;
     panel.innerHTML = [
       '<div class="qa-hdr">',
-      '  <h1><span>⚡</span> AEM QA Auditor <span style="font-size:10px;opacity:0.7;">v' + CONFIG.version + '</span></h1>',
-      '  <button id="qa-close-btn">✕ Close</button>',
+      '  <h1><span class="qa-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span> AEM QA <span class="qa-v">v' + CONFIG.version + '</span></h1>',
+      '  <button id="qa-close-btn">Close</button>',
       '</div>',
       '<div class="qa-meta">',
       '  <span>' + location.hostname + '</span>',
@@ -1327,26 +1331,28 @@
       '</div>',
       '<div class="qa-bod" id="qa-body">',
       '  <div class="qa-pil" data-pillar="metadata">',
-      '    <div class="qa-ph"><span class="qa-pt">📄 Metadata</span><span class="qa-ps" id="qa-ps-metadata">--</span></div>',
+      '    <div class="qa-ph"><span class="qa-pt">Metadata</span><span class="qa-ps" id="qa-ps-metadata">--</span></div>',
       '    <div class="qa-pb open" id="qa-pb-metadata"></div>',
       '  </div>',
       '  <div class="qa-pil" data-pillar="content">',
-      '    <div class="qa-ph"><span class="qa-pt">🧩 Content & Components</span><span class="qa-ps" id="qa-ps-content">--</span></div>',
+      '    <div class="qa-ph"><span class="qa-pt">Content and components</span><span class="qa-ps" id="qa-ps-content">--</span></div>',
       '    <div class="qa-pb open" id="qa-pb-content"></div>',
       '  </div>',
       '  <div class="qa-pil" data-pillar="responsive">',
-      '    <div class="qa-ph"><span class="qa-pt">📱 Responsive Layout</span><span class="qa-ps" id="qa-ps-responsive">--</span></div>',
+      '    <div class="qa-ph"><span class="qa-pt">Responsive layout</span><span class="qa-ps" id="qa-ps-responsive">--</span></div>',
       '    <div class="qa-pb" id="qa-pb-responsive"></div>',
       '  </div>',
       '  <div class="qa-pil" data-pillar="accessibility">',
-      '    <div class="qa-ph"><span class="qa-pt">♿ Accessibility</span><span class="qa-ps" id="qa-ps-accessibility">--</span></div>',
+      '    <div class="qa-ph"><span class="qa-pt">Accessibility</span><span class="qa-ps" id="qa-ps-accessibility">--</span></div>',
       '    <div class="qa-pb" id="qa-pb-accessibility"></div>',
       '  </div>',
       '</div>',
       '<div class="qa-ftr">',
-      '  <button id="qa-btn-export" class="primary">📤 Export JSON</button>',
-      '  <button id="qa-btn-copy">📋 Copy Report</button>',
-      '  <button id="qa-btn-server">📡 Send to Server</button>',
+      '  <div class="qa-bp">',
+      '  <button id="qa-btn-server" class="qa-primary">Send to dashboard</button>',
+      '  <button id="qa-btn-export">Export JSON</button>',
+      '  <button id="qa-btn-copy">Copy report</button>',
+      '  </div>',
       '</div>'
     ].join('\n');
 
@@ -1406,10 +1412,10 @@
       '  <div class="qa-status-tag ' + g.status + '">' + g.status.replace(/_/g, ' ') + '</div>',
       '</div>',
       isQuick
-        ? '<div style="font-size:10px;color:#9CA3AF;background:rgba(20,80,245,.12);border:1px solid #1450F5;border-radius:6px;padding:6px 9px;margin-bottom:8px;line-height:1.5;">⚡ <b>Quick scan</b> — P1 blockers only, links sampled. Run a full audit for the complete 49-check picture.</div>'
+        ? '<div style="font-size:11px;color:#141414;background:#F3EEE6;border-left:3px solid #1450F5;border-radius:4px;padding:8px 11px;margin-bottom:10px;line-height:1.5;"><b>Quick scan</b> — P1 blockers only, links sampled. Run a full audit for the complete 49-check picture.</div>'
         : '',
       '<div class="qa-bar"><div class="qa-fill" style="width:' + overall + '%;background:' + fillBg + ';"></div></div>',
-      p1Fails > 0 ? '<div class="qa-p1a">🚨 BLOCKS GO-LIVE — ' + p1Fails + ' P1 Critical Failure(s)</div>' : '',
+      p1Fails > 0 ? '<div class="qa-p1a">Blocks go-live — ' + p1Fails + ' P1 ' + (p1Fails === 1 ? 'failure' : 'failures') + '</div>' : '',
       // Per-pillar percentages are omitted in quick mode: derived from P1s
       // alone they are not the pillar health a reader would assume.
       isQuick ? '' : [
@@ -1433,9 +1439,9 @@
     }
 
     var html = checks.map(function (c) {
-      var icon = c.status === 'pass' ? '✅'
-        : c.status === 'warn' ? '⚠️'
-          : c.status === 'fail' ? '❌' : 'ℹ️';
+      var icon = c.status === 'pass' ? "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 12l5 5L20 6\"/></svg>"
+        : c.status === 'warn' ? "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3 1.5 21h21L12 3zM12 10v5M12 18h.01\"/></svg>"
+          : c.status === 'fail' ? "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 6l12 12M18 6L6 18\"/></svg>" : "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM12 11v5M12 8h.01\"/></svg>";
 
       var itemsHtml = '';
       if (c.items && c.items.length > 0) {
@@ -1539,15 +1545,15 @@
     style.textContent = [
       '@keyframes qa-slide{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}',
       '@keyframes qa-fade{from{opacity:1}to{opacity:0}}',
-      '#aem-qa-toast{position:fixed;bottom:24px;right:24px;width:288px;',
-      'background:#0A0F1E;color:#F9FAFB;border:1px solid #1450F5;border-radius:12px;',
-      'padding:14px 18px;font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;',
-      'font-size:13px;z-index:2147483647;box-shadow:0 8px 32px rgba(0,0,0,0.65);',
+      '#aem-qa-toast{position:fixed;bottom:24px;right:24px;width:300px;',
+      'background:#FFFFFF;color:#141414;border:1px solid #E6E6E6;border-left:4px solid #1450F5;border-radius:8px;',
+      'padding:14px 18px;font-family:Inter,system-ui,-apple-system,Arial,sans-serif;',
+      'font-size:13px;z-index:2147483647;box-shadow:0 6px 20px rgba(20,20,20,0.10);',
       'animation:qa-slide 0.3s ease;line-height:1.6;}',
       '#aem-qa-toast.qa-done{animation:qa-fade 0.5s ease 3.5s forwards;}',
-      '#aem-qa-toast .qa-t-title{font-weight:700;font-size:14px;color:#fff;margin-bottom:4px;}',
-      '#aem-qa-toast .qa-t-msg{color:#9CA3AF;font-size:12px;min-height:16px;}',
-      '#aem-qa-toast .qa-t-bar{height:3px;background:#1F2937;border-radius:2px;margin-top:10px;overflow:hidden;}',
+      '#aem-qa-toast .qa-t-title{font-weight:600;font-size:14px;color:#141414;margin-bottom:4px;}',
+      '#aem-qa-toast .qa-t-msg{color:#727272;font-size:12px;min-height:16px;}',
+      '#aem-qa-toast .qa-t-bar{height:3px;background:#E6E6E6;border-radius:2px;margin-top:10px;overflow:hidden;}',
       '#aem-qa-toast .qa-t-fill{height:100%;background:#1450F5;border-radius:2px;transition:width 0.4s ease;}'
     ].join('');
     document.head.appendChild(style);
@@ -1555,8 +1561,8 @@
     var toast = document.createElement('div');
     toast.id = TOAST_ID;
     toast.innerHTML = [
-      '<div class="qa-t-title">⚡ AEM QA Auditor</div>',
-      '<div class="qa-t-msg" id="qa-t-msg">🔄 Running checks…</div>',
+      '<div class="qa-t-title">AEM QA</div>',
+      '<div class="qa-t-msg" id="qa-t-msg">Running checks…</div>',
       '<div class="qa-t-bar"><div class="qa-t-fill" id="qa-t-fill" style="width:5%"></div></div>'
     ].join('');
     document.body.appendChild(toast);
@@ -1568,7 +1574,7 @@
     var msg = document.getElementById('qa-t-msg');
     if (!msg) return;
     msg.textContent = message;
-    if (isError) msg.style.color = '#EF4444';
+    if (isError) msg.style.color = '#FF5F28';
 
     var fill = document.getElementById('qa-t-fill');
     if (fill && typeof percent === 'number') fill.style.width = percent + '%';
@@ -1688,8 +1694,8 @@
     var score = data.meta.overallScore;
     var goNoGo = data.meta.goNoGo || 'UNKNOWN';
     var isPass = goNoGo === 'PASS' || goNoGo === 'PASS_WITH_WARNINGS';
-    var gc = isPass ? '#00e5b0' : ((score === null || score >= 50) ? '#ffb84f' : '#ff4f6a');
-    var icon = isPass ? '✅' : ((score === null || score >= 50) ? '⚠️' : '❌');
+    var gc = isPass ? '#1ED273' : ((score === null || score >= 50) ? '#FFA023' : '#FF5F28');
+    var icon = isPass ? CHECK_SVG : ((score === null || score >= 50) ? WARN_SVG : FAIL_SVG);
     var shortU = location.href.length > 68 ? location.href.slice(0, 68) + '…' : location.href;
 
     // Quick scans have no comparable 0-100, so headline the blocker count.
@@ -1697,14 +1703,14 @@
       ? data.meta.p1FailCount + ' blocker' + (data.meta.p1FailCount === 1 ? '' : 's')
       : score + ' / 100';
 
-    var inner = '<div style="background:#1a1f2e;border-radius:14px;padding:28px 32px;max-width:420px;width:88%;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.75);border:2px solid ' + gc + ';box-sizing:border-box;font-family:system-ui,sans-serif">'
-      + '<div style="font-size:2.2rem;margin-bottom:10px">' + icon + '</div>'
-      + '<div style="font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:' + gc + ';margin-bottom:14px">AEM QA '
+    var inner = '<div style="background:#FFFFFF;border-radius:8px;padding:28px 32px;max-width:430px;width:88%;text-align:left;box-shadow:0 6px 20px rgba(20,20,20,.14);border:1px solid #E6E6E6;border-top:4px solid ' + gc + ';box-sizing:border-box;font-family:Inter,system-ui,-apple-system,Arial,sans-serif;color:#141414">'
+      + '<div style="color:' + gc + ';margin-bottom:12px;line-height:0">' + icon + '</div>'
+      + '<div style="font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase;color:#1450F5;margin-bottom:12px">AEM QA '
       + (data.meta.auditMode === 'quick' ? 'Quick Scan' : 'Audit') + ' Complete</div>'
-      + '<div style="background:#0d0f18;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px 18px;font-family:monospace;font-size:22px;font-weight:700;color:' + gc + ';letter-spacing:2px;margin-bottom:12px">' + headlineValue + '</div>'
-      + '<div style="color:#9ca3af;font-size:12px;margin-bottom:8px">Status: <b style="color:' + gc + '">' + goNoGo + '</b></div>'
-      + '<div style="font-size:10px;color:#3d4870;margin-bottom:14px;word-break:break-all;overflow:hidden;max-height:26px">' + shortU + '</div>'
-      + '<div id="__qaaudcl__" style="font-size:11px;color:#6b7599;background:#0d0f18;border-radius:6px;padding:6px 14px;display:block;line-height:1.5">📡 Sending to the QA dashboard…</div>'
+      + '<div style="background:#F3EEE6;border-radius:8px;padding:12px 16px;font-size:26px;font-weight:400;color:' + gc + ';letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-bottom:12px">' + headlineValue + '</div>'
+      + '<div style="color:#727272;font-size:12px;margin-bottom:8px">Status: <b style="color:#141414">' + goNoGo + '</b></div>'
+      + '<div style="font-size:10px;color:#A1A1A1;margin-bottom:14px;word-break:break-all;overflow:hidden;max-height:26px">' + shortU + '</div>'
+      + '<div id="__qaaudcl__" style="font-size:11px;color:#727272;background:#F3EEE6;border-radius:4px;padding:8px 12px;display:block;line-height:1.5">Sending to the QA dashboard…</div>'
       + '</div>';
 
     // Try <dialog>.showModal() — browser top-layer, beats ALL z-index/overflow:hidden
@@ -1713,7 +1719,7 @@
       var old = document.getElementById('__qaaud__'); if (old) old.remove();
       var dlg = document.createElement('dialog');
       dlg.id = '__qaaud__';
-      dlg.style.cssText = 'background:rgba(0,0,0,.8);border:none;padding:0;margin:0;width:100vw;height:100vh;max-width:100vw;max-height:100vh;overflow:hidden;box-sizing:border-box;display:flex;align-items:center;justify-content:center';
+      dlg.style.cssText = 'background:rgba(20,20,20,.55);border:none;padding:0;margin:0;width:100vw;height:100vh;max-width:100vw;max-height:100vh;overflow:hidden;box-sizing:border-box;display:flex;align-items:center;justify-content:center';
       dlg.innerHTML = inner;
       document.body.appendChild(dlg);
       dlg.showModal();
@@ -1725,7 +1731,7 @@
       var old2 = document.getElementById('__qaaud__'); if (old2) old2.remove();
       var ov = document.createElement('div');
       ov.id = '__qaaud__';
-      ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);z-index:2147483647;display:flex;align-items:center;justify-content:center';
+      ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,20,20,.55);z-index:2147483647;display:flex;align-items:center;justify-content:center';
       ov.innerHTML = inner;
       (document.body || document.documentElement).appendChild(ov);
     }
@@ -1738,10 +1744,10 @@
 
     if (outcome.ok) {
       if (status) {
-        status.style.color = '#00e5b0';
-        status.textContent = '✅ ' + outcome.message + ' — closing…';
+        status.style.color = '#0B7A42';
+        status.textContent = outcome.message + ' — closing…';
       }
-      updateToast('✅ ' + headlineValue + ' — ' + goNoGo + ' — delivered to dashboard', 100, false, true);
+      updateToast(headlineValue + ' — ' + goNoGo + ' — delivered to dashboard', 100, false, true);
       setTimeout(function () {
         var el = document.getElementById('__qaaud__');
         if (el) el.remove();
@@ -1752,11 +1758,11 @@
     // Failure: keep the dialog open, explain why, and leave the operator a way
     // to salvage the result rather than silently losing the audit.
     if (status) {
-      status.style.color = '#ff4f6a';
-      status.innerHTML = '❌ <b>Not delivered.</b><br>' + escapeHtmlText(outcome.message)
-        + '<br><br><button id="__qaretry__" style="background:#1450F5;color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:11px;cursor:pointer;margin-right:6px">Retry</button>'
-        + '<button id="__qadl__" style="background:#2a3350;color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:11px;cursor:pointer;margin-right:6px">Download JSON</button>'
-        + '<button id="__qaclose__" style="background:none;color:#6b7599;border:none;font-size:11px;cursor:pointer">Close</button>';
+      status.style.color = '#B23A11';
+      status.innerHTML = '<b>Not delivered.</b><br>' + escapeHtmlText(outcome.message)
+        + '<br><br><button id="__qaretry__" style="background:#1450F5;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:11px;font-weight:600;cursor:pointer;margin-right:6px">Retry</button>'
+        + '<button id="__qadl__" style="background:#fff;color:#141414;border:1px solid #D0D0D0;border-radius:8px;padding:7px 14px;font-size:11px;font-weight:600;cursor:pointer;margin-right:6px">Download JSON</button>'
+        + '<button id="__qaclose__" style="background:none;color:#727272;border:none;font-size:11px;cursor:pointer">Close</button>';
 
       var retry = document.getElementById('__qaretry__');
       if (retry) retry.addEventListener('click', function () {
@@ -1772,8 +1778,12 @@
         if (el) el.remove();
       });
     }
-    updateToast('❌ Report not delivered — ' + outcome.message, 100, true, false);
+    updateToast('Report not delivered — ' + outcome.message, 100, true, false);
   }
+
+  var CHECK_SVG = '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>';
+  var WARN_SVG  = '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 1.5 21h21L12 3zM12 10v5M12 18h.01"/></svg>';
+  var FAIL_SVG  = '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
   function escapeHtmlText(s) {
     return String(s == null ? '' : s)

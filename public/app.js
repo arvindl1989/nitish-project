@@ -41,7 +41,7 @@
     reportsData.unshift(report);
     renderReportList(reportsData);
     if (report.id) { selectReport(report.id); }
-    showLaunchBanner('success', '⚡ New audit received instantly via browser event! Score: ' + (report.meta.overallScore || '?') + '/100 — ' + (report.meta.status || ''));
+    showLaunchBanner('success', 'New audit received. Score: ' + (report.meta.overallScore || '?') + '/100 — ' + (report.meta.status || ''));
   }
 
   // The compiled bookmarklet is fetched from the server rather than embedded
@@ -100,7 +100,7 @@
           var code = spec.get();
           if (!code) return; // loadBookmarklet already surfaced the error
           navigator.clipboard.writeText(code).then(function () {
-            alert('✅ "' + spec.name + '" copied to clipboard!\n\nTo install:\n1. Right-click your browser Bookmarks Bar -> "Add Page..."\n2. Name: ' + spec.name + '\n3. Paste this copied code into the URL field.');
+            alert('"' + spec.name + '" copied to clipboard.\n\nTo install:\n1. Right-click your browser Bookmarks Bar -> "Add Page..."\n2. Name: ' + spec.name + '\n3. Paste this copied code into the URL field.');
           });
         });
       });
@@ -113,7 +113,7 @@
       launchBtn.addEventListener('click', function () {
         var rawUrl = targetInput.value.trim();
         if (!rawUrl) {
-          showLaunchBanner('error', '⚠️ Please paste a target URL first.');
+          showLaunchBanner('error', 'Paste a target URL first.');
           return;
         }
 
@@ -134,8 +134,8 @@
 
         // Show in-page guidance banner
         showLaunchBanner('waiting',
-          '⏳ Target page opened in a new tab. ' +
-          'Click your <strong>⚡ AEM QA Auditor</strong> bookmarklet on that page — ' +
+          'Target page opened in a new tab. ' +
+          'Click your <strong>AEM QA</strong> bookmarklet on that page — ' +
           'the audit will run in the background and this dashboard will update automatically.');
 
         // Ensure polling is active
@@ -179,17 +179,18 @@
         launcher.parentNode.insertBefore(banner, launcher.nextSibling);
       }
     }
-    var bg = type === 'error' ? 'rgba(239,68,68,0.12)' :
-              type === 'success' ? 'rgba(16,185,129,0.12)' :
-              'rgba(20,80,245,0.1)';
-    var border = type === 'error' ? '#EF4444' :
-                  type === 'success' ? '#10B981' :
+    // KONE UI-state accents: red #FF5F28, green #1ED273, KONE Blue #1450F5.
+    var bg = type === 'error' ? 'rgba(255,95,40,0.10)' :
+              type === 'success' ? 'rgba(30,210,115,0.12)' :
+              'rgba(20,80,245,0.08)';
+    var border = type === 'error' ? '#FF5F28' :
+                  type === 'success' ? '#1ED273' :
                   '#1450F5';
     banner.style.background = bg;
     banner.style.border = '1px solid ' + border;
     banner.innerHTML = '<span>' + html + '</span>' +
       '<button onclick="document.getElementById(\'launch-status-banner\').style.display=\'none\'" ' +
-      'style="background:none;border:none;color:inherit;cursor:pointer;font-size:16px;opacity:0.6;padding:0">✕</button>';
+      'style="background:none;border:none;color:inherit;cursor:pointer;font-size:16px;opacity:0.6;padding:0">×</button>';
     banner.style.display = 'flex';
   }
 
@@ -206,7 +207,7 @@
             reportsData = data;
             renderReportList(reportsData);
             if (!isFirstLoad) {
-              showLaunchBanner('success', '✅ New audit report received! Live-updated dashboard.');
+              showLaunchBanner('success', 'New audit report received.');
               if (data[0] && data[0].id) {
                 selectReport(data[0].id);
               }
@@ -247,6 +248,13 @@
       });
   }
 
+  var ICONS = {
+    pass: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>',
+    warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 1.5 21h21L12 3zM12 10v5M12 18h.01"/></svg>',
+    fail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM12 11v5M12 8h.01"/></svg>'
+  };
+
   function renderReportList(items) {
     var listContainer = document.getElementById('report-list');
     var countBadge = document.getElementById('report-count');
@@ -283,7 +291,7 @@
         '  </div>',
         '  <div class="item-meta">',
         '    <span class="status-chip ' + item.status + '">' + (item.status || 'UNKNOWN').replace(/_/g, ' ') + '</span>',
-        isQuick ? '    <span class="mode-chip" title="Quick scan: 15 P1 blockers, links sampled">⚡ QUICK</span>' : '',
+        isQuick ? '    <span class="mode-chip" title="Quick scan: 15 P1 blockers, links sampled">Quick</span>' : '',
         '    <span>' + timeStr + '</span>',
         '  </div>',
         '</div>'
@@ -338,38 +346,66 @@
     var a11yScore = scores.accessibility ? scores.accessibility.score : 0;
 
     var overallClass = meta.overallScore >= 80 ? (meta.overallScore >= 90 ? 'p' : 'w') : 'f';
+    var isQuick = meta.auditMode === 'quick';
+    var blockers = typeof meta.p1FailCount === 'number' ? meta.p1FailCount : 0;
+
+    // A quick scan ran only the 15 P1 checks: it has no overall score and its
+    // per-pillar percentages are derived from P1s alone, so neither is shown.
+    // Rendering them anyway is how this pane came to display "null/100".
+    var scoreOverview = isQuick
+      ? [
+          '  <div class="score-overview" style="grid-template-columns:repeat(2,minmax(0,1fr));">',
+          '    <div class="score-box">',
+          '      <div class="score-box-title">Go-live blockers</div>',
+          '      <div class="score-box-val item-score ' + (blockers ? 'f' : 'p') + '">' + blockers + '</div>',
+          '    </div>',
+          '    <div class="score-box">',
+          '      <div class="score-box-title">Checks run</div>',
+          '      <div class="score-box-val">' + (meta.checksRun || checks.length) + '</div>',
+          '    </div>',
+          '  </div>',
+          '  <p style="margin-top:12px;font-size:12px;color:var(--text-secondary);">',
+          '    Quick scan — P1 blockers only, links sampled. Run a full audit for the complete 49-check picture.',
+          '  </p>'
+        ].join('\n')
+      : [
+          '  <div class="score-overview">',
+          '    <div class="score-box">',
+          '      <div class="score-box-title">Overall score</div>',
+          '      <div class="score-box-val item-score ' + overallClass + '">' + meta.overallScore + '/100</div>',
+          '    </div>',
+          '    <div class="score-box">',
+          '      <div class="score-box-title">Metadata</div>',
+          '      <div class="score-box-val">' + metaScore + '%</div>',
+          '    </div>',
+          '    <div class="score-box">',
+          '      <div class="score-box-title">Content</div>',
+          '      <div class="score-box-val">' + contentScore + '%</div>',
+          '    </div>',
+          '    <div class="score-box">',
+          '      <div class="score-box-title">Responsive</div>',
+          '      <div class="score-box-val">' + respScore + '%</div>',
+          '    </div>',
+          '    <div class="score-box">',
+          '      <div class="score-box-title">Accessibility</div>',
+          '      <div class="score-box-val">' + a11yScore + '%</div>',
+          '    </div>',
+          '  </div>'
+        ].join('\n');
 
     var html = [
       '<div class="detail-header">',
       '  <div class="detail-title-row">',
       '    <div>',
       '      <div class="detail-url">' + meta.url + '</div>',
-      '      <div class="detail-timestamp">Audited: ' + meta.auditedAt + ' • Tool v' + (meta.toolVersion || '1.0.0') + '</div>',
+      '      <div class="detail-timestamp">Audited ' + meta.auditedAt + ' · Tool v' + (meta.toolVersion || '1.0.0') + '</div>',
       '    </div>',
-      '    <span class="status-chip ' + meta.status + '" style="font-size:12px;padding:6px 12px;">' + (meta.status || 'UNKNOWN').replace(/_/g, ' ') + '</span>',
-      '  </div>',
-      '  <div class="score-overview">',
-      '    <div class="score-box">',
-      '      <div class="score-box-title">Overall Score</div>',
-      '      <div class="score-box-val item-score ' + overallClass + '">' + meta.overallScore + '/100</div>',
-      '    </div>',
-      '    <div class="score-box">',
-      '      <div class="score-box-title">Metadata</div>',
-      '      <div class="score-box-val">' + metaScore + '%</div>',
-      '    </div>',
-      '    <div class="score-box">',
-      '      <div class="score-box-title">Content</div>',
-      '      <div class="score-box-val">' + contentScore + '%</div>',
-      '    </div>',
-      '    <div class="score-box">',
-      '      <div class="score-box-title">Responsive</div>',
-      '      <div class="score-box-val">' + respScore + '%</div>',
-      '    </div>',
-      '    <div class="score-box">',
-      '      <div class="score-box-title">Accessibility</div>',
-      '      <div class="score-box-val">' + a11yScore + '%</div>',
+      '    <div style="display:flex;gap:8px;align-items:center;flex:none;">',
+      isQuick ? '      <span class="mode-chip">Quick</span>' : '',
+      '      <span class="status-chip ' + meta.status + '" style="font-size:12px;padding:6px 12px;">' + (meta.status || 'UNKNOWN').replace(/_/g, ' ') + '</span>',
       '    </div>',
       '  </div>',
+      scoreOverview,
       '</div>',
       '<div class="checks-grid">',
       renderPillarSection('Metadata Checks', checks.filter(function (c) { return c.pillar === 'metadata'; })),
@@ -387,10 +423,10 @@
 
     return [
       '<div class="pillar-section">',
-      '  <div class="pillar-title"><span>' + title + '</span><span>' + checks.length + ' checks</span></div>',
+      '  <div class="pillar-title"><span>' + title + '</span><span>' + checks.length + (checks.length === 1 ? ' check' : ' checks') + '</span></div>',
       '  <div class="pillar-body">',
       checks.map(function (c) {
-        var icon = c.status === 'pass' ? '✅' : (c.status === 'warn' ? '⚠️' : (c.status === 'fail' ? '❌' : 'ℹ️'));
+        var icon = ICONS[c.status] || ICONS.info;
         var itemsHtml = '';
         if (c.items && c.items.length > 0) {
           itemsHtml = '<div class="items-box">' + c.items.map(function (it) {
