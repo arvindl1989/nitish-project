@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AEM QA Framework — Cloud Audit Hub</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Navigation -->
+    <header class="navbar">
+      <div class="logo">
+        <span class="logo-icon">⚡</span>
+        <div>
+          <h1>AEM QA Framework</h1>
+          <p class="subtitle">Cloud Audit Hub & Automated Quality Engine</p>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <button id="refresh-btn" class="btn secondary">🔄 Refresh Reports</button>
+      </div>
+    </header>
+
+    <!-- URL Launcher Banner -->
+    <section class="launcher-banner">
+      <div class="launcher-card">
+        <div class="launcher-text">
+          <h2>🎯 Audit Any AEM Page or Website</h2>
+          <p>Paste a live site URL or unreleased AEM Preview link below to open and audit.</p>
+        </div>
+
+        <div class="launcher-input-row">
+          <input type="url" id="target-url-input" placeholder="Paste URL here (e.g. https://www.kone.com or AEM preview link)...">
+          <button id="launch-audit-btn" class="btn primary-launch">🚀 Open & Audit Page</button>
+        </div>
+
+        <div class="bookmarklet-installer">
+          <span class="installer-label">💡 1-Click Browser Bookmarklet (Drag to Bookmarks Bar):</span>
+          <a id="drag-bookmarklet-link" class="bookmark-btn" href="#">⚡ AEM QA Auditor</a>
+          <button id="copy-bookmark-btn" class="btn micro">📋 Copy Code</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Workspace -->
+    <main class="main-content">
+      <!-- Left sidebar: List of Reports -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h2>Audit Reports</h2>
+          <span class="badge" id="report-count">0</span>
+        </div>
+        <div class="search-box">
+          <input type="text" id="search-input" placeholder="Filter by URL or status...">
+        </div>
+        <div class="report-list" id="report-list">
+          <div class="loading">Loading reports...</div>
+        </div>
+      </aside>
+
+      <!-- Right main area: Detailed View -->
+      <section class="report-detail" id="report-detail">
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <h3>Select an Audit Report</h3>
+          <p>Choose a report from the sidebar to inspect detailed pillar scores, P1 blocks, and quality check findings.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
