@@ -13,11 +13,11 @@ The **AEM QA Framework** is a zero-dependency, browser-native QA automation plat
 
 ## ⚡ Quick Links & Navigation
 
-- 👔 [**Non-Technical Stakeholder & Executive QA Overview**](file:///c:/git-repo/QA/STAKEHOLDER_QA_OVERVIEW.md)
-- 📖 [**QA Framework Technical Architecture Guide**](file:///c:/git-repo/QA/QA_FRAMEWORK_DOCUMENTATION.md)
-- 📗 [**AEM QA Framework Comprehensive Implementation Guide**](file:///c:/git-repo/QA/AEM_QA_FRAMEWORK_GUIDE.md)
-- 📊 [**Sprint Demo Presentation Guide**](file:///c:/git-repo/QA/SPRINT_DEMO_PRESENTATION_GUIDE.md)
-- 📜 [**Prototype Walkthrough**](file:///c:/git-repo/QA/walkthrough.md)
+- 👔 [**Non-Technical Stakeholder & Executive QA Overview**](./STAKEHOLDER_QA_OVERVIEW.md)
+- 📖 [**QA Framework Technical Architecture Guide**](./QA_FRAMEWORK_DOCUMENTATION.md)
+- 📗 [**AEM QA Framework Comprehensive Implementation Guide**](./AEM_QA_FRAMEWORK_GUIDE.md)
+- 📊 [**Sprint Demo Presentation Guide**](./SPRINT_DEMO_PRESENTATION_GUIDE.md)
+- 📜 [**Prototype Walkthrough**](./walkthrough.md)
 
 ---
 
@@ -47,7 +47,7 @@ The AEM QA Framework executes **inside your active, authenticated browser tab**,
 - ⚡ **Asynchronous Link & CTA Verification**: Batch-checks link health via background `HEAD`/`GET` requests with configurable concurrency limits and timeouts.
 - 🎨 **Floating Dark Mode QA Side Panel**: Renders immediate weighted scores, PASS/WARN/FAIL statuses, and P1 Hard Blocker alerts without disturbing page layout.
 - 📊 **Centralized Quality Dashboard**: Includes an interactive Web UI (`public/index.html`) for multi-page report aggregation, trend analysis, and defect inspection.
-- ☁️ **Dual Server Operating Mode**: Runs as a local HTTP report server (`server.js` / `server.local.js`) or deploys serverlessly to Vercel (`api/report.js`).
+- ☁️ **Dual Server Operating Mode**: Runs as a local HTTP report server (`aem-qa-tool/server.local.js`) or deploys serverlessly to Vercel (`api/report.js`).
 
 ---
 
@@ -59,25 +59,33 @@ QA/
 ├── QA_FRAMEWORK_DOCUMENTATION.md      ← Full Architecture & Technical Reference
 ├── AEM_QA_FRAMEWORK_GUIDE.md          ← Exhaustive Implementation Blueprint
 ├── SPRINT_DEMO_PRESENTATION_GUIDE.md  ← Executive & Sprint Presentation Walkthrough
+├── STAKEHOLDER_QA_OVERVIEW.md         ← Non-Technical Stakeholder Overview
 ├── walkthrough.md                     ← Prototype Walkthrough & Verification Steps
 ├── package.json                       ← Root NPM scripts
 ├── vercel.json                        ← Vercel Serverless Deployment Manifest
+├── .vercelignore                      ← Files excluded from Vercel deployments
 ├── api/
 │   └── report.js                      ← Vercel Serverless API Endpoint (/api/report)
-├── public/                            ← Dashboard Web Application Assets
+├── public/                            ← Dashboard Web Application Assets (deployed root)
 │   ├── index.html                     ← Dashboard UI (Dark-mode SPA)
 │   ├── style.css                      ← Design System & Dashboard Styles
-│   └── app.js                         ← Dashboard Client Logic & Fetching
+│   ├── app.js                         ← Dashboard Client Logic & Fetching
+│   └── bookmarklet.js                 ← Generated: engine served to the cloud loader
 └── aem-qa-tool/                       ← Core QA Engine & Build Scripts
-    ├── bookmarklet.js                 ← Master QA Engine (52 Checks + Side Panel UI)
+    ├── bookmarklet.js                 ← Master QA Engine (Source of Truth)
     ├── build-bookmarklet.js           ← Minifier & Bookmarklet Encoder
     ├── build-cloud-bookmarklet.js     ← Cloud-ready Bookmarklet Generator
     ├── build-standalone.js            ← Offline Self-contained Bookmarklet Generator
     ├── server.local.js                ← Local Zero-Dependency HTTP Server (Port 3500)
-    ├── AEM_QA_BOOKMARK.txt            ← Compiled Bookmarklet (Cloud Endpoint)
-    ├── AEM_QA_BOOKMARK_LOCAL.txt      ← Compiled Bookmarklet (Localhost:3500)
-    └── AEM_QA_BOOKMARK_STANDALONE.txt ← Compiled Bookmarklet (In-memory engine)
+    ├── AEM_QA_BOOKMARK.txt            ← Generated: inline engine payload
+    ├── AEM_QA_BOOKMARK_CLOUD.txt      ← Generated: remote <script> loader stub
+    ├── AEM_QA_BOOKMARK_LOCAL.txt      ← Generated: payload posting to localhost:3500
+    └── AEM_QA_BOOKMARK_STANDALONE.txt ← Generated: payload posting to Vercel
 ```
+
+> **Note:** `public/bookmarklet.js` and the four `AEM_QA_BOOKMARK*.txt` files are **build
+> outputs** generated from `aem-qa-tool/bookmarklet.js`. Edit the engine, then re-run the
+> build scripts — do not edit the generated files by hand.
 
 ---
 
@@ -116,8 +124,8 @@ QA/
 To audit any live page or AEM author/stage preview:
 
 1. Open one of the compiled bookmarklet text files depending on your setup:
-   - **Cloud/Vercel Mode**: Open [`AEM_QA_BOOKMARK.txt`](file:///c:/git-repo/QA/aem-qa-tool/AEM_QA_BOOKMARK.txt)
-   - **Local Mode**: Open [`AEM_QA_BOOKMARK_LOCAL.txt`](file:///c:/git-repo/QA/aem-qa-tool/AEM_QA_BOOKMARK_LOCAL.txt)
+   - **Cloud/Vercel Mode**: Open [`AEM_QA_BOOKMARK.txt`](./aem-qa-tool/AEM_QA_BOOKMARK.txt)
+   - **Local Mode**: Open [`AEM_QA_BOOKMARK_LOCAL.txt`](./aem-qa-tool/AEM_QA_BOOKMARK_LOCAL.txt)
 2. Copy the entire contents of the text file (starts with `javascript:`).
 3. In your Web Browser:
    - Open Bookmarks Manager (`Ctrl+Shift+O` or `Cmd+Option+B`).
@@ -155,20 +163,20 @@ To audit any live page or AEM author/stage preview:
 
 The project includes a production-ready configuration for Vercel deployment:
 
-- **Static Frontend**: Serves [`public/index.html`](file:///c:/git-repo/QA/public/index.html) as the global dashboard.
-- **Serverless API**: Routes `/api/report`, `/api/reports`, and `/api/report-details` to [`api/report.js`](file:///c:/git-repo/QA/api/report.js).
+- **Static Frontend**: Serves [`public/index.html`](./public/index.html) as the global dashboard.
+- **Serverless API**: Routes `/api/report`, `/api/reports`, and `/api/report-details` to [`api/report.js`](./api/report.js).
 
 To deploy to Vercel:
 ```bash
 npx vercel
 ```
-Or connect your Git repository to Vercel using the provided [`vercel.json`](file:///c:/git-repo/QA/vercel.json).
+Or connect your Git repository to Vercel using the provided [`vercel.json`](./vercel.json).
 
 ---
 
 ## 🛠️ Building & Re-compiling Bookmarklets
 
-If you modify [`bookmarklet.js`](file:///c:/git-repo/QA/aem-qa-tool/bookmarklet.js), re-generate the bookmarklet payloads using the build scripts:
+If you modify [`bookmarklet.js`](./aem-qa-tool/bookmarklet.js), re-generate the bookmarklet payloads using the build scripts:
 
 ```bash
 # Build cloud bookmarklet
@@ -187,9 +195,9 @@ node aem-qa-tool/build-standalone.js
 
 For detailed technical guides and architecture blueprints, refer to the project documentation files:
 
-1. 📘 [**QA Framework Technical Architecture Guide**](file:///c:/git-repo/QA/QA_FRAMEWORK_DOCUMENTATION.md): Complete architecture breakdown, 52-check reference matrix, server endpoints, and customizing checks.
-2. 📗 [**AEM QA Framework Implementation Guide**](file:///c:/git-repo/QA/AEM_QA_FRAMEWORK_GUIDE.md): Deep-dive reference code and step-by-step framework build manual.
-3. 📙 [**Sprint Demo Presentation Guide**](file:///c:/git-repo/QA/SPRINT_DEMO_PRESENTATION_GUIDE.md): Slide deck structure and live demonstration script.
+1. 📘 [**QA Framework Technical Architecture Guide**](./QA_FRAMEWORK_DOCUMENTATION.md): Complete architecture breakdown, 52-check reference matrix, server endpoints, and customizing checks.
+2. 📗 [**AEM QA Framework Implementation Guide**](./AEM_QA_FRAMEWORK_GUIDE.md): Deep-dive reference code and step-by-step framework build manual.
+3. 📙 [**Sprint Demo Presentation Guide**](./SPRINT_DEMO_PRESENTATION_GUIDE.md): Slide deck structure and live demonstration script.
 
 ---
 

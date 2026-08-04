@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "node build-cloud-bookmarklet.js",
-    "start": "node server.js"
+    "build": "node aem-qa-tool/build-cloud-bookmarklet.js",
+    "start": "node aem-qa-tool/server.local.js"
   }
 }

@@ -1,6 +1,6 @@
 # AEM QA Framework Prototype Walkthrough
 
-We have built the complete zero-dependency **AEM QA Framework** prototype inside `g:\git repo\QA\aem-qa-tool\`.
+We have built the complete zero-dependency **AEM QA Framework** prototype inside `aem-qa-tool/`.
 
 ## 📁 Artifacts Created
 

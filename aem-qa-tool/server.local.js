@@ -8,8 +8,8 @@ var path = require('path');
 var url  = require('url');
 
 var PORT    = process.env.PORT || 3500;
-var REPORTS = path.join(__dirname, 'reports');
-var PUBLIC  = path.join(__dirname, 'public');
+var REPORTS = path.join(__dirname, '..', 'reports');
+var PUBLIC  = path.join(__dirname, '..', 'public');
 
 try {
   if (!fs.existsSync(REPORTS)) fs.mkdirSync(REPORTS, { recursive: true });

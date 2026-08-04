@@ -1,0 +1,14 @@
+# Audit reports written by the local server
+reports/
+
+# Dependencies (project is zero-dependency, but keep npm noise out)
+node_modules/
+npm-debug.log*
+
+# Vercel
+.vercel/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp

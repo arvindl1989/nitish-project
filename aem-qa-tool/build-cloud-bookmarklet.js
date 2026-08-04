@@ -5,7 +5,7 @@ var fs   = require('fs');
 var path = require('path');
 
 var srcPath = path.join(__dirname, 'bookmarklet.js');
-var publicDstPath = path.join(__dirname, 'public', 'bookmarklet.js');
+var publicDstPath = path.join(__dirname, '..', 'public', 'bookmarklet.js');
 var src = fs.readFileSync(srcPath, 'utf8');
 
 // 1. Copy bookmarklet.js to public/ directory for Vercel static serving
