@@ -47,7 +47,7 @@ The **AEM QA Framework** solves these challenges by running directly inside the 
                   ▼                                       ▼
 ┌───────────────────────────────────┐     ┌───────────────────────────────────┐
 │     52 Automated Audit Checks     │     │     Central QA Dashboard Server   │
-│ (Metadata, Content, a11y, Visual) │     │    (Local Server or Vercel API)    │
+│ (Metadata, Content, a11y, Visual) │     │      (Local Server or Railway)       │
 └───────────────────────────────────┘     └───────────────────────────────────┘
 ```
 
@@ -58,7 +58,7 @@ The **AEM QA Framework** solves these challenges by running directly inside the 
 ### 2.1 Technical Stack & Dependencies
 - **Core Engine**: Pure Vanilla JavaScript (ES5/ES6 compatible).
 - **Styling**: Zero CSS framework dependencies. Isolated CSS injected via shadow/prefixed stylesheet.
-- **Backend API**: Zero npm dependencies. Native Node.js `http` module or Vercel Serverless Node runtime.
+- **Backend API**: Zero npm dependencies. Native Node.js `http` module, run locally or on Railway.
 - **Dashboard**: Plain HTML5, Vanilla CSS3 (Dark Theme), and ES6 Fetch API.
 
 ### 2.2 End-to-End Execution Sequence
@@ -201,7 +201,7 @@ $$\text{Overall Score} = (S_{\text{meta}} \times 0.25) + (S_{\text{content}} \ti
 
 ## 4. Bookmarklet Engine & Build System
 
-### 4.1 Master Engine Blueprint ([`bookmarklet.js`](./aem-qa-tool/bookmarklet.js))
+### 4.1 Master Engine Blueprint ([`bookmarklet.js`](../src/bookmarklet.js))
 The bookmarklet script is wrapped in an Immediately Invoked Function Expression (IIFE) to isolate variable scope from the audited host page:
 
 ```javascript
@@ -238,19 +238,19 @@ The bookmarklet script is wrapped in an Immediately Invoked Function Expression 
 ### 4.2 Build & Minification Pipeline
 Because browsers restrict bookmarklet URLs to a single `javascript:...` string, the source JS file must be minified, URL-encoded, and formatted.
 
-The framework provides three build scripts in `aem-qa-tool/`:
+The framework provides a single build script, `scripts/build.js`, which emits all three payload variants:
 
-1. **[`build-cloud-bookmarklet.js`](./aem-qa-tool/build-cloud-bookmarklet.js)**:
-   - Encodes bookmarklet to auto-detect Vercel server origin dynamically or send to `/api/report`.
-   - Output: [`AEM_QA_BOOKMARK.txt`](./aem-qa-tool/AEM_QA_BOOKMARK.txt) & [`AEM_QA_BOOKMARK_CLOUD.txt`](./aem-qa-tool/AEM_QA_BOOKMARK_CLOUD.txt).
+1. **[`build-cloud-bookmarklet.js`](../scripts/build.js)**:
+   - Encodes the bookmarklet to auto-detect its serving origin, or to post to a build-injected `/api/report` endpoint.
+   - Output: [`AEM_QA_BOOKMARK.txt`](../dist/AEM_QA_BOOKMARK_HOSTED.txt) & [`AEM_QA_BOOKMARK_CLOUD.txt`](../dist/AEM_QA_BOOKMARK_LOADER.txt).
 
-2. **[`build-bookmarklet.js`](./aem-qa-tool/build-bookmarklet.js)**:
+2. **[`build-bookmarklet.js`](../scripts/build.js)**:
    - Configured for local development targeting `http://localhost:3500/report`.
-   - Output: [`AEM_QA_BOOKMARK_LOCAL.txt`](./aem-qa-tool/AEM_QA_BOOKMARK_LOCAL.txt).
+   - Output: [`AEM_QA_BOOKMARK_LOCAL.txt`](../dist/AEM_QA_BOOKMARK_LOCAL.txt).
 
-3. **[`build-standalone.js`](./aem-qa-tool/build-standalone.js)**:
+3. **[`build-standalone.js`](../scripts/build.js)**:
    - Generates an offline self-contained bookmarklet payload that renders UI without requiring external server endpoints.
-   - Output: [`AEM_QA_BOOKMARK_STANDALONE.txt`](./aem-qa-tool/AEM_QA_BOOKMARK_STANDALONE.txt).
+   - Output: [`AEM_QA_BOOKMARK_STANDALONE.txt`](../dist/AEM_QA_BOOKMARK_HOSTED.txt).
 
 ---
 
@@ -268,9 +268,9 @@ The backend receives JSON audit reports submitted by the bookmarklet side panel 
                   ┌─────────────────────────┴─────────────────────────┐
                   ▼                                                   ▼
 ┌───────────────────────────────────┐               ┌───────────────────────────────────┐
-│     Local Node HTTP Server        │               │   Vercel Serverless Function      │
-│  (aem-qa-tool/server.local.js)    │               │         (api/report.js)           │
-│   • Runs on http://localhost:3500 │               │   • Deployed via vercel.json      │
+│     Local Node HTTP Server        │               │   Railway (persistent Node)       │
+│         (server.js)               │               │         (server.js)               │
+│   • Runs on http://localhost:3500 │               │   • Deployed via railway.toml     │
 │   • Serves static public/ assets  │               │   • Endpoint: /api/report         │
 │   • In-memory report storage      │               │   • Serverless environment memory │
 └───────────────────────────────────┘               └───────────────────────────────────┘
@@ -348,7 +348,7 @@ The backend receives JSON audit reports submitted by the bookmarklet side panel 
 
 ## 6. Central Dashboard Web Application
 
-The central dashboard is served from `public/` ([`public/index.html`](./public/index.html), [`public/app.js`](./public/app.js), [`public/style.css`](./public/style.css)).
+The central dashboard is served from `public/` ([`public/index.html`](../public/index.html), [`public/app.js`](../public/app.js), [`public/style.css`](../public/style.css)).
 
 ### 6.1 Features
 - **Dark Mode Analytics UI**: Clean modern visual layout built with responsive CSS grid and flexbox.
@@ -363,7 +363,7 @@ The central dashboard is served from `public/` ([`public/index.html`](./public/i
 To adapt the framework for custom AEM implementations (e.g. specialized Core Components or client-specific DOM class names):
 
 ### 7.1 Customizing Component Selectors in `bookmarklet.js`
-Modify the `CONFIG.selectors` dictionary in [`bookmarklet.js`](./aem-qa-tool/bookmarklet.js):
+Modify the `CONFIG.selectors` dictionary in [`bookmarklet.js`](../src/bookmarklet.js):
 
 ```javascript
 selectors: {

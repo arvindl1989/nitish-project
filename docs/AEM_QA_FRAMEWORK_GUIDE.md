@@ -38,7 +38,7 @@ The AEM QA Framework is a **browser bookmarklet** that runs automated quality ch
 
 ```
 INPUT:  Any AEM page URL open in your browser
-OUTPUT: 52-point audit report with pass/warn/fail per check
+OUTPUT: 49-point audit report with pass/warn/fail per check
 TIME:   ~1s for DOM checks + ~10s for async link verification
 DEPS:   Zero — pure browser JavaScript APIs only
 ```
@@ -85,10 +85,9 @@ javascript: URL executes in page context
 ### Files
 
 ```
-aem-qa-tool/
-├── bookmarklet.js          ← THE MAIN FILE (all logic lives here)
-├── build-bookmarklet.js    ← Minify → output javascript: URL
-├── server.js               ← Optional: report history server
+├── src/bookmarklet.js      ← THE MAIN FILE (all engine logic lives here)
+├── scripts/build.js        ← Minify → emit the javascript: payloads into dist/
+├── server.js               ← Dashboard host + report API
 └── public/
     ├── index.html
     ├── style.css
@@ -108,15 +107,12 @@ aem-qa-tool/
 ### One-Time Build
 
 ```bash
-# 1. Create project folder
-mkdir aem-qa-tool
-cd aem-qa-tool
+# 1. Clone the repository
+git clone <repository-url> && cd <repo>
 
-# 2. Create all files (from sections below)
-
-# 3. Generate bookmarklet
-node build-bookmarklet.js
-# → Creates: AEM_QA_BOOKMARK.txt
+# 2. Generate the bookmarklet payloads
+npm run build
+# → Creates: dist/AEM_QA_BOOKMARK_LOCAL.txt, _HOSTED.txt, _LOADER.txt
 
 # 4. Copy the javascript:... URL from AEM_QA_BOOKMARK.txt
 # 5. Browser → Bookmarks → Add new bookmark
@@ -1766,6 +1762,6 @@ A-13        P1        Access.      No empty anchor links
 ⭐ = Links & CTAs — highest business impact
 P1 failure on ANY check = automatic go-live BLOCK
 ────────────────────────────────────────────────────────────────
-TOTAL: 52 checks | 13 P1 | 20 P2 | 10 P3 | 5 P4
+TOTAL: 49 checks | 15 P1 | 19 P2 | 10 P3 | 5 P4
 DEPS:  Zero npm packages — pure vanilla browser JS
 ```
