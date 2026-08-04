@@ -46,17 +46,56 @@ runs `scripts/build.js` first (via `prestart`) and then boots the server.
 3. Click the bookmark. The audit panel opens, checks run, and **Send to Server**
    pushes the result to your dashboard.
 
-Three payload variants are produced in `dist/`:
+### Two audit modes
 
-| File | Reports to | Use when |
+Install **both** bookmarklets — they answer different questions.
+
+| | 🔍 Full audit | ⚡ Quick scan |
 |---|---|---|
-| `AEM_QA_BOOKMARK_LOCAL.txt` | `http://localhost:3500` | Local development |
-| `AEM_QA_BOOKMARK_HOSTED.txt` | your `--endpoint` | Shared/team use |
-| `AEM_QA_BOOKMARK_LOADER.txt` | loads the engine over HTTP | Small bookmark field; **blocked by CSP on most production AEM sites** — prefer a self-contained payload there |
+| Checks | all 49 | the 15 P1 blockers |
+| Links | every link verified | first 25 sampled, 2s timeout |
+| Answers | "how healthy is this page?" | "is anything blocking go-live?" |
+| Result | score out of 100 | blocker count |
+
+Both reach the **same go/no-go verdict**, because that verdict keys off P1
+failures alone — quick mode drops the P2/P3/P4 detail, not the decision. Use
+Quick while fixing, Full before signing off.
+
+A quick scan reports **no 0–100 score**, deliberately. Only P1 checks ran, so a
+page failing ten P2s would score 100 — a number that cannot be compared to a
+full audit is worse than no number. The dashboard tags these reports `⚡ QUICK`
+and shows the blocker count in place of a score. Sampling is always stated
+("24 broken in a sample of 25 of 62"), so a sampled pass is never mistaken for
+full coverage.
+
+Payloads produced in `dist/`:
+
+| File | Mode | Reports to |
+|---|---|---|
+| `AEM_QA_BOOKMARK_LOCAL_FULL.txt` | full | `http://localhost:3500` |
+| `AEM_QA_BOOKMARK_LOCAL_QUICK.txt` | quick | `http://localhost:3500` |
+| `AEM_QA_BOOKMARK_HOSTED_FULL.txt` | full | your `--endpoint` |
+| `AEM_QA_BOOKMARK_HOSTED_QUICK.txt` | quick | your `--endpoint` |
+| `AEM_QA_BOOKMARK_LOADER.txt` | full | loads the engine over HTTP; **blocked by CSP on most production AEM** — prefer a self-contained payload |
 
 ```bash
 npm run build -- --endpoint https://<app>.up.railway.app/api/report
 ```
+
+### Getting results back into the dashboard
+
+The report reaches the dashboard over three channels, tried together:
+
+1. `postMessage` to the opener — only when the page was opened via the
+   dashboard's launcher.
+2. `BroadcastChannel` — same-origin only, so a no-op for a real AEM audit.
+3. **HTTP POST** — the authoritative channel, and the one that matters.
+
+The bookmarklet **waits for the POST and reports the real outcome**. On failure
+it stays on screen, names the cause, and offers Retry / Download JSON. The most
+common cause is a bookmarklet built without `--endpoint`, which bakes in
+`localhost:3500` and is then blocked as mixed content on an HTTPS page — the
+dialog says exactly that.
 
 ---
 
@@ -152,13 +191,16 @@ Override engine behaviour per-site without editing it, by setting
 
 ```js
 window.__AEM_QA_CONFIG__ = {
+  mode: 'quick',                // 'full' (default, 49 checks) or 'quick' (15 P1 blockers)
   ui: 'toast',                  // 'panel' (default) or fire-and-forget 'toast'
   autoSend: true,               // send without clicking, in panel mode
   reportServer: 'https://…/api/report',
   apiToken: '…',                // when the server sets QA_API_TOKEN
   thresholdScore: 85,
   selectors: { cta: ['a.my-button'] },   // defaults target KONE + AEM Core Components
-  weights: { accessibility: 0.35 }
+  weights: { accessibility: 0.35 },
+  quickLinkSample: 25,          // links sampled in quick mode
+  quickLinkTimeout: 2000
 };
 ```
 

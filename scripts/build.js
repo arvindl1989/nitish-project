@@ -96,8 +96,10 @@ function minify(code) {
     .trim();
 }
 
-function configure(code, ep, tok) {
-  var out = code.replace(/'__QA_ENDPOINT__'/g, JSON.stringify(ep));
+function configure(code, ep, tok, mode) {
+  var out = code
+    .replace(/'__QA_ENDPOINT__'/g, JSON.stringify(ep))
+    .replace(/'__QA_MODE__'/g, JSON.stringify(mode || 'full'));
   if (tok) {
     // Bake the token into the payload so the bookmarklet can authenticate
     // against a server that has QA_API_TOKEN set.
@@ -129,14 +131,27 @@ console.log('');
 //    tag that loaded it, which is more robust than any baked-in value.
 write(path.join(PUBLIC, 'bookmarklet.js'), src, 'engine (served)');
 
-// 2. Self-contained payloads.
-write(path.join(DIST, 'AEM_QA_BOOKMARK_LOCAL.txt'),
-      toBookmarklet(configure(src, 'http://localhost:3500/api/report', '')),
-      'self-contained → localhost:3500');
+// 2. Self-contained payloads, one per (target × mode).
+//    full  — all 49 checks, every link verified (~10-15s)
+//    quick — the 15 P1 blockers, links sampled (~2-3s)
+[
+  ['LOCAL',  'http://localhost:3500/api/report', '',    'localhost:3500'],
+  ['HOSTED', endpoint,                            token, 'hosted']
+].forEach(function (target) {
+  var name = target[0], ep = target[1], tok = target[2], label = target[3];
+  ['FULL', 'QUICK'].forEach(function (mode) {
+    write(path.join(DIST, 'AEM_QA_BOOKMARK_' + name + '_' + mode + '.txt'),
+          toBookmarklet(configure(src, ep, tok, mode.toLowerCase())),
+          mode.toLowerCase() + ' → ' + label);
+  });
+});
 
-write(path.join(DIST, 'AEM_QA_BOOKMARK_HOSTED.txt'),
-      toBookmarklet(configure(src, endpoint, token)),
-      'self-contained → hosted');
+// Unsuffixed aliases keep older bookmark installs and docs pointing at the
+// full audit rather than 404ing after the mode split.
+['LOCAL', 'HOSTED'].forEach(function (name) {
+  fs.copyFileSync(path.join(DIST, 'AEM_QA_BOOKMARK_' + name + '_FULL.txt'),
+                  path.join(DIST, 'AEM_QA_BOOKMARK_' + name + '.txt'));
+});
 
 // 3. Loader stub — small enough to survive any bookmark field, but blocked by
 //    CSP on sites that restrict script-src (most production AEM). Prefer the
